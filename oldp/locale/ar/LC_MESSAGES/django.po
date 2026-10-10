@@ -1,0 +1,2713 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-03 16:24+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: Draft\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#: apps/accounts/admin.py:34
+msgid "Permission Details"
+msgstr ""
+
+#: apps/accounts/admin.py:41
+msgid "Permission"
+msgstr ""
+
+#: apps/accounts/admin.py:54 apps/accounts/models.py:45
+#: apps/accounts/models.py:78
+msgid "Description"
+msgstr ""
+
+#: apps/accounts/admin.py:61
+#, python-brace-format
+msgid "Used in {} permission group(s)"
+msgstr ""
+
+#: apps/accounts/admin.py:65
+msgid "Usage"
+msgstr ""
+
+#: apps/accounts/admin.py:86
+msgid "Group Information"
+msgstr ""
+
+#: apps/accounts/admin.py:88 apps/accounts/admin.py:111
+#: apps/accounts/admin.py:228 apps/accounts/models.py:85
+msgid "Permissions"
+msgstr ""
+
+#: apps/accounts/admin.py:92
+msgid "Select the permissions that tokens in this group will have access to."
+msgstr ""
+
+#: apps/accounts/admin.py:96 apps/accounts/admin.py:238
+#: apps/accounts/admin.py:384
+msgid "Timestamps"
+msgstr ""
+
+#: apps/accounts/admin.py:107
+msgid "No permissions"
+msgstr ""
+
+#: apps/accounts/admin.py:122
+msgid "Tokens"
+msgstr ""
+
+#: apps/accounts/admin.py:152 apps/accounts/admin.py:247
+#: apps/accounts/models.py:201
+msgid "API Token"
+msgstr ""
+
+#: apps/accounts/admin.py:165 apps/accounts/admin.py:260
+#: apps/accounts/models.py:139 apps/accounts/models.py:349
+msgid "User"
+msgstr ""
+
+#: apps/accounts/admin.py:172
+msgid "Are you sure you want to revoke this token?"
+msgstr ""
+
+#: apps/accounts/admin.py:173
+#: apps/accounts/templates/accounts/app_api_tokens.html:132
+msgid "Revoke"
+msgstr ""
+
+#: apps/accounts/admin.py:176
+msgid "Actions"
+msgstr ""
+
+#: apps/accounts/admin.py:185 apps/accounts/admin.py:304
+#, python-brace-format
+msgid "{} token(s) were successfully revoked."
+msgstr ""
+
+#: apps/accounts/admin.py:188 apps/accounts/admin.py:307
+msgid "Revoke selected tokens"
+msgstr ""
+
+#: apps/accounts/admin.py:190 apps/accounts/admin.py:226
+msgid "Token Information"
+msgstr ""
+
+#: apps/accounts/admin.py:232
+msgid ""
+"Permission group defines what resources this token can access. Legacy scopes"
+" field is deprecated."
+msgstr ""
+
+#: apps/accounts/admin.py:237 assets/templates/account/email.html:25
+msgid "Status"
+msgstr "الحالة"
+
+#: apps/accounts/admin.py:272
+msgid "No group (legacy)"
+msgstr ""
+
+#: apps/accounts/admin.py:275 apps/accounts/models.py:177
+msgid "Permission Group"
+msgstr ""
+
+#: apps/accounts/admin.py:282
+msgid "Default"
+msgstr ""
+
+#: apps/accounts/admin.py:284 apps/accounts/models.py:191
+msgid "Rate Limit"
+msgstr ""
+
+#: apps/accounts/admin.py:290
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:43
+#: apps/accounts/templates/accounts/app_api_tokens.html:123
+msgid "Expired"
+msgstr ""
+
+#: apps/accounts/admin.py:292
+msgid "Valid"
+msgstr ""
+
+#: apps/accounts/admin.py:293
+#: apps/accounts/templates/accounts/app_api_tokens.html:116
+#: apps/accounts/templates/accounts/personal_api_tokens.html:60
+msgid "Never"
+msgstr ""
+
+#: apps/accounts/admin.py:295
+msgid "Expiration Status"
+msgstr ""
+
+#: apps/accounts/admin.py:313
+#, python-brace-format
+msgid "{} token(s) were successfully activated."
+msgstr ""
+
+#: apps/accounts/admin.py:316
+msgid "Activate selected tokens"
+msgstr ""
+
+#: apps/accounts/admin.py:322
+#, python-brace-format
+msgid "{} token(s) were successfully deactivated."
+msgstr ""
+
+#: apps/accounts/admin.py:325
+msgid "Deactivate selected tokens"
+msgstr ""
+
+#: apps/accounts/admin.py:338 apps/accounts/admin.py:354
+#: apps/accounts/templates/accounts/profile.html:96
+msgid "Profile"
+msgstr ""
+
+#: apps/accounts/admin.py:358
+msgid "Newsletter consent"
+msgstr ""
+
+#: apps/accounts/admin.py:369
+msgid "Enrichment"
+msgstr ""
+
+#: apps/accounts/admin.py:372
+msgid "API limits"
+msgstr ""
+
+#: apps/accounts/admin.py:374
+msgid "Inactivity lifecycle"
+msgstr ""
+
+#: apps/accounts/admin.py:401 apps/accounts/models.py:366
+msgid "Role"
+msgstr ""
+
+#: apps/accounts/admin.py:406 apps/accounts/forms.py:27
+#: apps/accounts/models.py:360
+msgid "Organization"
+msgstr ""
+
+#: apps/accounts/admin.py:456
+msgid "Profile complete"
+msgstr ""
+
+#: apps/accounts/admin.py:460
+msgid "Subscriber"
+msgstr ""
+
+#: apps/accounts/admin.py:464
+msgid "Cancel pending deletion (clear warning)"
+msgstr ""
+
+#: apps/accounts/admin.py:479
+#, python-brace-format
+msgid "Cleared the pending deletion for {} account(s)."
+msgstr ""
+
+#: apps/accounts/authentication.py:50
+msgid "Invalid token."
+msgstr ""
+
+#: apps/accounts/authentication.py:53
+msgid "Token is inactive."
+msgstr ""
+
+#: apps/accounts/authentication.py:56
+msgid "Token has expired."
+msgstr ""
+
+#: apps/accounts/authentication.py:59
+msgid "User inactive or deleted."
+msgstr ""
+
+#: apps/accounts/forms.py:31
+msgid "Company, university, or project (optional)"
+msgstr ""
+
+#: apps/accounts/forms.py:35
+msgid "How do you use Open Legal Data?"
+msgstr ""
+
+#: apps/accounts/forms.py:36
+msgid "— Prefer not to say —"
+msgstr ""
+
+#: apps/accounts/forms.py:40
+msgid "What are you building?"
+msgstr ""
+
+#: apps/accounts/forms.py:46
+msgid "Optional: tell us what you plan to do with the data."
+msgstr ""
+
+#: apps/accounts/forms.py:53 apps/accounts/forms.py:118
+msgid ""
+"Send me occasional product updates and news by email. I can unsubscribe at "
+"any time."
+msgstr ""
+
+#: apps/accounts/forms.py:98 apps/accounts/models.py:378
+msgid "Country"
+msgstr "البلد"
+
+#: apps/accounts/forms.py:130
+msgid "Confirm your username"
+msgstr ""
+
+#: apps/accounts/forms.py:131
+msgid "Type your username to permanently delete your account."
+msgstr ""
+
+#: apps/accounts/forms.py:143
+msgid "The username does not match. Your account was not deleted."
+msgstr ""
+
+#: apps/accounts/models.py:18 apps/cases/templates/cases/case.html:141
+#: apps/cases/templates/cases/case_filter.html:47
+#: apps/cases/templates/cases/index.html:9
+#: apps/cases/templates/cases/stats/base.html:113 apps/cases/views.py:76
+#: apps/courts/templates/courts/cases_list.html:55
+#: assets/templates/admin/index.html:20 assets/templates/header.html:18
+msgid "Cases"
+msgstr "القضايا"
+
+#: apps/accounts/models.py:19 apps/laws/templates/laws/index.html:9
+#: apps/laws/templates/laws/law.html:75 apps/laws/views.py:72
+#: assets/templates/admin/index.html:24 assets/templates/header.html:31
+msgid "Laws"
+msgstr "القوانين"
+
+#: apps/accounts/models.py:20 apps/courts/templates/courts/cases_list.html:13
+#: apps/courts/templates/courts/court_filter.html:41 apps/courts/views.py:48
+#: assets/templates/admin/index.html:32 assets/templates/header.html:24
+msgid "Courts"
+msgstr "المحاكم"
+
+#: apps/accounts/models.py:21 assets/templates/admin/index.html:28
+msgid "Law Books"
+msgstr ""
+
+#: apps/accounts/models.py:22 apps/laws/templates/laws/references.html:6
+#: apps/references/templates/references.html:6
+msgid "References"
+msgstr "المراجع"
+
+#: apps/accounts/models.py:23
+msgid "Annotations"
+msgstr ""
+
+#: apps/accounts/models.py:27
+msgid "Read"
+msgstr ""
+
+#: apps/accounts/models.py:28
+msgid "Write"
+msgstr ""
+
+#: apps/accounts/models.py:29
+msgid "Delete"
+msgstr ""
+
+#: apps/accounts/models.py:33
+msgid "Resource"
+msgstr ""
+
+#: apps/accounts/models.py:36
+msgid "The resource this permission applies to"
+msgstr ""
+
+#: apps/accounts/models.py:39
+msgid "Action"
+msgstr ""
+
+#: apps/accounts/models.py:42
+msgid "The action allowed on this resource"
+msgstr ""
+
+#: apps/accounts/models.py:47
+msgid "Optional description of what this permission allows"
+msgstr ""
+
+#: apps/accounts/models.py:51
+msgid "API Token Permission"
+msgstr ""
+
+#: apps/accounts/models.py:52
+msgid "API Token Permissions"
+msgstr ""
+
+#: apps/accounts/models.py:72 apps/accounts/models.py:143
+#: apps/cases/templates/cases/stats/base.html:171
+#: apps/lib/tests/test_filters.py:77
+msgid "Name"
+msgstr "الاسم"
+
+#: apps/accounts/models.py:75
+msgid "Unique name for this permission group"
+msgstr ""
+
+#: apps/accounts/models.py:80
+msgid "Description of what this permission group allows"
+msgstr ""
+
+#: apps/accounts/models.py:87
+msgid "Permissions included in this group"
+msgstr ""
+
+#: apps/accounts/models.py:90
+msgid "Is Default"
+msgstr ""
+
+#: apps/accounts/models.py:92
+msgid "Whether this is the default permission group for new tokens"
+msgstr ""
+
+#: apps/accounts/models.py:94 apps/accounts/models.py:152
+#: apps/accounts/models.py:476
+msgid "Created"
+msgstr ""
+
+#: apps/accounts/models.py:95 apps/accounts/models.py:477
+msgid "Updated"
+msgstr ""
+
+#: apps/accounts/models.py:98
+msgid "API Token Permission Group"
+msgstr ""
+
+#: apps/accounts/models.py:99
+msgid "API Token Permission Groups"
+msgstr ""
+
+#: apps/accounts/models.py:129
+msgid "Key"
+msgstr ""
+
+#: apps/accounts/models.py:133
+msgid "The API token key"
+msgstr ""
+
+#: apps/accounts/models.py:140
+msgid "The user this token belongs to"
+msgstr ""
+
+#: apps/accounts/models.py:146
+msgid ""
+"A descriptive name for this token (e.g., 'Production Server', 'CI/CD "
+"Pipeline')"
+msgstr ""
+
+#: apps/accounts/models.py:152
+msgid "When this token was created"
+msgstr ""
+
+#: apps/accounts/models.py:155
+#: apps/accounts/templates/accounts/profile.html:65
+msgid "Last used"
+msgstr ""
+
+#: apps/accounts/models.py:158
+msgid "When this token was last used"
+msgstr ""
+
+#: apps/accounts/models.py:161
+msgid "Expires at"
+msgstr ""
+
+#: apps/accounts/models.py:164
+msgid "When this token expires (null = never expires)"
+msgstr ""
+
+#: apps/accounts/models.py:169
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:45
+#: apps/accounts/templates/accounts/app_api_tokens.html:125
+msgid "Active"
+msgstr ""
+
+#: apps/accounts/models.py:169
+msgid "Whether this token is currently active"
+msgstr ""
+
+#: apps/accounts/models.py:179
+msgid ""
+"The permission group assigned to this token (defines what resources it can "
+"access)"
+msgstr ""
+
+#: apps/accounts/models.py:183
+msgid "Scopes"
+msgstr ""
+
+#: apps/accounts/models.py:187
+msgid ""
+"Deprecated: Use permission_group instead. List of scopes this token has "
+"access to"
+msgstr ""
+
+#: apps/accounts/models.py:195
+msgid ""
+"Custom rate limit in requests per hour for this token. Leave blank to use "
+"the default rate."
+msgstr ""
+
+#: apps/accounts/models.py:202 apps/accounts/views.py:249
+msgid "API Tokens"
+msgstr ""
+
+#: apps/accounts/models.py:325
+msgid "Researcher / Academia"
+msgstr ""
+
+#: apps/accounts/models.py:326
+msgid "Journalist"
+msgstr ""
+
+#: apps/accounts/models.py:327
+msgid "Developer"
+msgstr ""
+
+#: apps/accounts/models.py:328
+msgid "Legal tech / Startup"
+msgstr ""
+
+#: apps/accounts/models.py:329
+msgid "Lawyer / Legal professional"
+msgstr ""
+
+#: apps/accounts/models.py:330
+msgid "Student"
+msgstr ""
+
+#: apps/accounts/models.py:331 apps/cases/templates/cases/stats/base.html:172
+#: apps/contact/forms.py:86
+msgid "Other"
+msgstr "أخرى"
+
+#: apps/accounts/models.py:339
+msgid "Signup form"
+msgstr ""
+
+#: apps/accounts/models.py:340
+msgid "On-login prompt"
+msgstr ""
+
+#: apps/accounts/models.py:341 apps/accounts/templates/accounts/profile.html:7
+#: apps/accounts/templates/accounts/profile.html:14 apps/accounts/views.py:86
+#: apps/accounts/views.py:122 assets/templates/account/base.html:17
+#: assets/templates/header.html:43
+msgid "Dashboard"
+msgstr "لوحة التحكم"
+
+#: apps/accounts/models.py:342
+msgid "Imported"
+msgstr ""
+
+#: apps/accounts/models.py:354
+msgid "Display name"
+msgstr ""
+
+#: apps/accounts/models.py:357
+msgid "Optional public name; falls back to the username."
+msgstr ""
+
+#: apps/accounts/models.py:363
+msgid "Company, university, or project (optional)."
+msgstr ""
+
+#: apps/accounts/models.py:370
+msgid "How do you use Open Legal Data? (optional)"
+msgstr ""
+
+#: apps/accounts/models.py:373
+msgid "Use case"
+msgstr ""
+
+#: apps/accounts/models.py:375
+msgid "What are you building with Open Legal Data? (optional)"
+msgstr ""
+
+#: apps/accounts/models.py:381
+msgid "ISO 3166-1 alpha-2 country code (optional)."
+msgstr ""
+
+#: apps/accounts/models.py:386
+msgid "Newsletter opt-in"
+msgstr ""
+
+#: apps/accounts/models.py:389
+msgid "User requested marketing email. Not a valid consent until confirmed."
+msgstr ""
+
+#: apps/accounts/models.py:393
+msgid "Opt-in requested at"
+msgstr ""
+
+#: apps/accounts/models.py:396
+msgid "When the opt-in checkbox/toggle was set."
+msgstr ""
+
+#: apps/accounts/models.py:399
+msgid "Double-opt-in confirmed at"
+msgstr ""
+
+#: apps/accounts/models.py:403
+msgid ""
+"When the confirmation link was clicked. Required to send marketing mail."
+msgstr ""
+
+#: apps/accounts/models.py:407
+msgid "Consent source"
+msgstr ""
+
+#: apps/accounts/models.py:411
+msgid "Where the opt-in was captured (audit)."
+msgstr ""
+
+#: apps/accounts/models.py:416
+msgid "Enrichment prompted at"
+msgstr ""
+
+#: apps/accounts/models.py:420
+msgid ""
+"When the user was shown the one-time profile-enrichment prompt (set whether "
+"they filled it in or skipped, so it is shown once)."
+msgstr ""
+
+#: apps/accounts/models.py:425
+msgid "Enriched at"
+msgstr ""
+
+#: apps/accounts/models.py:429
+msgid "When the profile was first completed and the rate-limit bonus granted."
+msgstr ""
+
+#: apps/accounts/models.py:435
+msgid "Max API tokens"
+msgstr ""
+
+#: apps/accounts/models.py:439
+msgid ""
+"Per-user limit on application API tokens. Leave blank to use the system "
+"default (API_TOKENS_PER_USER_DEFAULT)."
+msgstr ""
+
+#: apps/accounts/models.py:449
+msgid "Deletion warning sent at"
+msgstr ""
+
+#: apps/accounts/models.py:452
+msgid "When the inactivity warning email was sent. Cleared on login."
+msgstr ""
+
+#: apps/accounts/models.py:455
+msgid "Deletion scheduled for"
+msgstr ""
+
+#: apps/accounts/models.py:459
+msgid ""
+"Deadline shown in the warning email. After this the account is deactivated "
+"unless the user logs in. Cleared on login."
+msgstr ""
+
+#: apps/accounts/models.py:464
+msgid "Deactivated at"
+msgstr ""
+
+#: apps/accounts/models.py:467
+msgid "When the account was deactivated (is_active=False) as inactive."
+msgstr ""
+
+#: apps/accounts/models.py:470
+msgid "Anonymized at"
+msgstr ""
+
+#: apps/accounts/models.py:473
+msgid "When the account's personal data was scrubbed (irreversible)."
+msgstr ""
+
+#: apps/accounts/models.py:480
+msgid "User Profile"
+msgstr ""
+
+#: apps/accounts/models.py:481
+msgid "User Profiles"
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:5
+#: apps/accounts/views.py:412
+msgid "Delete account"
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:14
+msgid "Delete your account"
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:16
+msgid ""
+"This permanently deletes your account, profile, API tokens and connected "
+"logins. This cannot be undone."
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:17
+msgid ""
+"Legal content you submitted via the API (cases, laws, courts) is public data"
+" and will be kept, but is no longer linked to your account."
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:18
+msgid ""
+"If you only want a copy of your data, you can export it first from your "
+"dashboard."
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:28
+#, python-format
+msgid "Type your username <strong>%(username)s</strong> to confirm:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:42
+msgid "Permanently delete my account"
+msgstr ""
+
+#: apps/accounts/templates/accounts/account_delete.html:43
+#: apps/accounts/templates/accounts/app_api_token_create.html:71
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:68
+#: assets/templates/oauth2_provider/authorize.html:62
+msgid "Cancel"
+msgstr "إلغاء"
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:5
+msgid "Create Application API Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:12
+msgid "Create New API Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:13
+msgid "Create a new API token for accessing the API from your applications."
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:31
+msgid "Token Name"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:39
+msgid "e.g., Production Server, CI/CD Pipeline, Development"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:43
+msgid "Give your token a descriptive name to remember what it's used for."
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:49
+msgid "Expiration"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:52
+msgid "30 days"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:53
+msgid "90 days"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:54
+msgid "6 months"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:55
+msgid "1 year"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:56
+msgid "2 years"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:57
+msgid "Never expires"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:60
+msgid ""
+"Choose when this token should expire. Tokens that expire improve security."
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:65
+msgid "Important:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:66
+msgid ""
+"The token will be shown only once after creation. Make sure to copy it and "
+"store it securely!"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:75
+msgid "Create Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:84
+msgid "Best Practices"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:88
+msgid "Use descriptive names for easy identification"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:89
+msgid "Create separate tokens for different applications or environments"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:90
+msgid "Set an expiration date for better security"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:91
+msgid "Revoke tokens immediately if they are compromised"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:92
+msgid "Never share tokens publicly or commit them to version control"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_create.html:93
+msgid "Rotate tokens periodically for enhanced security"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:5
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:13
+#: apps/accounts/views.py:338
+msgid "Revoke API Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:14
+msgid "Are you sure you want to revoke this API token?"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:19
+msgid "Warning: This action cannot be undone"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:23
+msgid "Token Name:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:26
+msgid "Token Key:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:31
+#: apps/accounts/templates/accounts/app_api_tokens.html:106
+#: apps/accounts/templates/accounts/personal_api_tokens.html:57
+msgid "Created:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:35
+#: apps/accounts/templates/accounts/app_api_tokens.html:112
+msgid "Last Used:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:39
+msgid "Status:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:48
+#: apps/accounts/templates/accounts/app_api_tokens.html:128
+msgid "Inactive"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:54
+msgid "What happens when you revoke this token?"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:56
+msgid "This token will be permanently deleted"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:57
+msgid "Any applications using this token will lose API access"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:58
+msgid "You will need to create a new token and update your applications"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:59
+msgid "This action cannot be undone"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:71
+msgid "Yes, Revoke This Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:80
+msgid "Alternative Actions"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:83
+msgid "If you\\"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:85
+msgid ""
+"Temporarily deactivate the token instead of deleting it (contact admin)"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:86
+msgid "Check when this token was last used to determine if it\\"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:87
+msgid ""
+"Update your applications to use a different token before revoking this one"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_token_revoke.html:88
+msgid "Create a new token with a different name if you need to reorganize"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:5
+msgid "Application API Tokens"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:12
+msgid "Manage Application API Tokens"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:13
+msgid ""
+"Create and manage multiple API tokens for different applications and "
+"services."
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:27
+msgid "New Token Created!"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:28
+msgid "Make sure to copy your new API token now. You won\\"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:44
+#: apps/accounts/templates/accounts/app_api_tokens.html:60
+#: apps/accounts/templates/accounts/app_api_tokens.html:68
+#: apps/accounts/templates/accounts/personal_api_tokens.html:47
+#: apps/accounts/templates/accounts/personal_api_tokens.html:166
+msgid "Copy"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:58
+#: apps/accounts/templates/accounts/app_api_tokens.html:66
+#: apps/accounts/templates/accounts/personal_api_tokens.html:162
+msgid "Copied!"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:75
+#, python-format
+msgid "%(token_count)s of %(max_tokens)s tokens used."
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:78
+msgid "Token limit reached. Revoke a token to create a new one."
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:79
+#: apps/accounts/templates/accounts/app_api_tokens.html:83
+msgid "Create New Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:87
+msgid "Back to Personal Tokens"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:94
+msgid "Your API Tokens"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:140
+#: apps/accounts/templates/accounts/personal_api_tokens.html:60
+msgid "Expires:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:151
+msgid "You don\\"
+msgstr ""
+
+#: apps/accounts/templates/accounts/app_api_tokens.html:156
+#: apps/accounts/templates/accounts/personal_api_tokens.html:67
+msgid "Usage Example:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/newsletter_confirm_message.txt:1
+#, python-format
+msgid "Hello %(username)s,"
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/newsletter_confirm_message.txt:3
+msgid ""
+"You (or someone using your email address) asked to receive the Open Legal "
+"Data newsletter."
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/newsletter_confirm_message.txt:5
+msgid "Please confirm your subscription by opening the link below:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/newsletter_confirm_message.txt:9
+msgid ""
+"If you did not request this, simply ignore this email — no newsletter will "
+"be sent without your confirmation."
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/newsletter_confirm_message.txt:11
+msgid "Open Legal Data"
+msgstr ""
+
+#: apps/accounts/templates/accounts/email/newsletter_confirm_subject.txt:1
+msgid "Please confirm your newsletter subscription"
+msgstr ""
+
+#: apps/accounts/templates/accounts/newsletter_confirm.html:5
+#: apps/accounts/templates/accounts/newsletter_confirm.html:9
+#: apps/accounts/views.py:372
+msgid "Newsletter confirmation"
+msgstr ""
+
+#: apps/accounts/templates/accounts/newsletter_confirm.html:13
+msgid "Thank you! Your newsletter subscription is now confirmed."
+msgstr ""
+
+#: apps/accounts/templates/accounts/newsletter_confirm.html:15
+msgid "You can manage your email preferences any time from your dashboard."
+msgstr ""
+
+#: apps/accounts/templates/accounts/newsletter_confirm.html:17
+#: apps/accounts/templates/accounts/newsletter_confirm.html:25
+msgid "Go to dashboard"
+msgstr ""
+
+#: apps/accounts/templates/accounts/newsletter_confirm.html:21
+msgid "This confirmation link is invalid or has expired."
+msgstr ""
+
+#: apps/accounts/templates/accounts/newsletter_confirm.html:23
+msgid "You can request a new confirmation from your dashboard."
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:5
+#: apps/accounts/templates/accounts/personal_api_tokens.html:12
+msgid "Personal API Tokens"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:13
+msgid ""
+"Use this token to authenticate API requests. Keep it secure and never share "
+"it publicly."
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:19
+msgid "Your API Token:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:35
+msgid "Show/Hide Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:38
+#: apps/accounts/templates/accounts/personal_api_tokens.html:103
+msgid "Show"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:45
+msgid "Copy to Clipboard"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:51
+msgid "Token copied to clipboard!"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:57
+msgid "When you registered"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:72
+msgid ""
+"Are you sure you want to renew your token? Your old token will stop working "
+"immediately."
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:73
+msgid "Renew Token"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:76
+msgid "API Documentation"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:79
+msgid "MCP Documentation"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:84
+msgid "Security Warning:"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:84
+msgid ""
+"Renewing your token will invalidate your current token immediately. Make "
+"sure to update all applications using the old token."
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:110
+msgid "Hide"
+msgstr ""
+
+#: apps/accounts/templates/accounts/personal_api_tokens.html:150
+msgid "Failed to copy token. Please copy it manually."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:28
+msgid ""
+"Complete your profile to raise your API rate limit and help us support power"
+" users."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:29
+msgid "Complete profile"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:36
+#: assets/templates/account/base.html:47 assets/templates/account/email.html:6
+#: assets/templates/header.html:37
+msgid "Account"
+msgstr "الحساب"
+
+#: apps/accounts/templates/accounts/profile.html:38
+msgid "Username"
+msgstr "اسم المستخدم"
+
+#: apps/accounts/templates/accounts/profile.html:40
+msgid "Email"
+msgstr "البريد الإلكتروني"
+
+#: apps/accounts/templates/accounts/profile.html:42
+msgid "Member since"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:51
+msgid "API access"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:53
+msgid "Active tokens"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:55
+msgid "Rate limit"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:58
+#, python-format
+msgid "%(custom_rate_limit)s requests/hour (custom)"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:60
+#, python-format
+msgid "%(enriched_rate_limit)s requests/hour (enriched)"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:62
+msgid "Default tier"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:72
+msgid "Usage this hour (REST API + MCP)"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:73
+#, python-format
+msgid "%(usage_used)s / %(effective_limit)s requests"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:80
+#, python-format
+msgid "%(usage_remaining)s requests remaining"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:83
+msgid "Manage tokens"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:86
+msgid "Need higher limits for production use?"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:87
+msgid "Contact us"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:100
+msgid "Save profile"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:108
+msgid "Email preferences"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:110
+msgid "You are subscribed to the newsletter."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:114
+msgid "Unsubscribe"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:117
+msgid "Please check your inbox to confirm your subscription."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:121
+msgid "Resend confirmation"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:124
+msgid ""
+"Get occasional product updates and news by email. You can unsubscribe any "
+"time."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:128
+msgid "Subscribe to newsletter"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:137
+msgid "Your data"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:138
+msgid "Download a copy of the personal data we hold about you as a ZIP file."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:140
+msgid "Export my data (ZIP)"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:143
+msgid ""
+"Permanently delete your account and personal data. This cannot be undone."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile.html:145
+msgid "Delete my account"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile_enrichment.html:6
+#: apps/accounts/views.py:208
+msgid "Complete your profile"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile_enrichment.html:10
+msgid "Welcome back! Help us improve Open Legal Data"
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile_enrichment.html:12
+msgid ""
+"Tell us a little about how you use Open Legal Data. It helps us support "
+"power users — and completing your profile raises your API rate limit."
+msgstr ""
+
+#: apps/accounts/templates/accounts/profile_enrichment.html:19
+msgid "Save"
+msgstr "حفظ"
+
+#: apps/accounts/templates/accounts/profile_enrichment.html:21
+msgid "Skip for now"
+msgstr ""
+
+#: apps/accounts/views.py:36
+#, python-brace-format
+msgid ""
+"Thanks! Your profile is complete and your API rate limit has been raised to "
+"{} requests/hour."
+msgstr ""
+
+#: apps/accounts/views.py:40
+msgid ""
+"Thanks! Your profile is complete and your API rate limit has been raised."
+msgstr ""
+
+#: apps/accounts/views.py:110
+msgid "Your profile has been updated."
+msgstr ""
+
+#: apps/accounts/views.py:116
+msgid "Please correct the errors below."
+msgstr ""
+
+#: apps/accounts/views.py:145
+msgid "You are already subscribed."
+msgstr ""
+
+#: apps/accounts/views.py:152
+msgid "Almost done — check your inbox to confirm your subscription."
+msgstr ""
+
+#: apps/accounts/views.py:157
+msgid "You have been unsubscribed."
+msgstr ""
+
+#: apps/accounts/views.py:200
+msgid "Thanks for updating your profile!"
+msgstr ""
+
+#: apps/accounts/views.py:224
+msgid "Your API access token has been renewed successfully."
+msgstr ""
+
+#: apps/accounts/views.py:268
+#, python-brace-format
+msgid ""
+"You have reached the maximum number of API tokens ({}). Revoke an existing "
+"token to create a new one."
+msgstr ""
+
+#: apps/accounts/views.py:278
+msgid "Token name is required."
+msgstr ""
+
+#: apps/accounts/views.py:304
+#, python-brace-format
+msgid ""
+"API token '{}' has been created successfully. Make sure to copy it now - you"
+" won't be able to see it again!"
+msgstr ""
+
+#: apps/accounts/views.py:315
+msgid "Create API Token"
+msgstr ""
+
+#: apps/accounts/views.py:330
+#, python-brace-format
+msgid "API token '{}' has been revoked successfully."
+msgstr ""
+
+#: apps/accounts/views.py:404
+msgid "Your account has been permanently deleted."
+msgstr ""
+
+#: apps/cases/filters.py:84 apps/cases/filters.py:201
+#: apps/cases/templates/cases/case.html:19
+#: apps/search/templates/search/facets.html:104
+msgid "Court"
+msgstr "المحكمة"
+
+#: apps/cases/filters.py:91 apps/cases/filters.py:207
+#: apps/cases/templates/cases/stats/base.html:80 apps/courts/filters.py:16
+#: apps/courts/filters.py:20 apps/courts/filters.py:43 apps/courts/views.py:27
+msgid "State"
+msgstr "الدولة / الجهة"
+
+#: apps/cases/filters.py:97 apps/cases/filters.py:102
+msgid "Has reference to"
+msgstr "يحيل إلى"
+
+#: apps/cases/filters.py:115 apps/courts/filters.py:26
+#: apps/search/templates/search/facets.html:117
+msgid "Jurisdiction"
+msgstr "الاختصاص"
+
+#: apps/cases/filters.py:121 apps/courts/filters.py:32
+#: apps/search/templates/search/facets.html:130
+msgid "Level of Appeal"
+msgstr "درجة التقاضي"
+
+#: apps/cases/filters.py:127 apps/cases/templates/cases/case.html:36
+#: apps/homepage/templates/homepage/landing_page.html:103
+msgid "Published on"
+msgstr "نُشر في"
+
+#: apps/cases/filters.py:163 apps/cases/views.py:39
+#: apps/search/templates/search/facets.html:145
+msgid "Publication date"
+msgstr "تاريخ النشر"
+
+#: apps/cases/filters.py:164
+msgid "Last modified date"
+msgstr "تاريخ آخر تعديل"
+
+#: apps/cases/filters.py:165 apps/cases/templates/cases/case.html:40
+#: apps/cases/views.py:36
+msgid "File number"
+msgstr "رقم الملف"
+
+#: apps/cases/models.py:318
+msgid "Unknown topic"
+msgstr "موضوع غير معروف"
+
+#: apps/cases/serializers.py:180
+msgid "Court name cannot be empty."
+msgstr ""
+
+#: apps/cases/serializers.py:184
+#, python-format
+msgid "Court name must not exceed %(max_length)s characters."
+msgstr ""
+
+#: apps/cases/serializers.py:197
+msgid "File number cannot be empty."
+msgstr ""
+
+#: apps/cases/serializers.py:202
+#, python-format
+msgid "File number must be at least %(min_length)s characters."
+msgstr ""
+
+#: apps/cases/serializers.py:207
+#, python-format
+msgid "File number must not exceed %(max_length)s characters."
+msgstr ""
+
+#: apps/cases/serializers.py:220
+msgid "Content cannot be empty."
+msgstr ""
+
+#: apps/cases/serializers.py:224 apps/laws/serializers.py:223
+#, python-format
+msgid "Content must be at least %(min_length)s characters."
+msgstr ""
+
+#: apps/cases/serializers.py:229 apps/laws/serializers.py:228
+#, python-format
+msgid "Content must not exceed %(max_length)s characters."
+msgstr ""
+
+#: apps/cases/serializers.py:245
+#, python-format
+msgid "Title must not exceed %(max_length)s characters."
+msgstr ""
+
+#: apps/cases/serializers.py:261
+#, python-format
+msgid "Abstract must not exceed %(max_length)s characters."
+msgstr ""
+
+#: apps/cases/serializers.py:275
+msgid "Source name cannot be empty."
+msgstr ""
+
+#: apps/cases/serializers.py:280
+msgid "Source name must not exceed 100 characters."
+msgstr ""
+
+#: apps/cases/stats_views.py:40
+msgid "Case Statistics"
+msgstr "إحصائيات القضايا"
+
+#: apps/cases/stats_views.py:49
+msgid "Cases by Country"
+msgstr "القضايا حسب البلد"
+
+#: apps/cases/stats_views.py:58
+msgid "Cases by State"
+msgstr "القضايا حسب الجهة"
+
+#: apps/cases/stats_views.py:67
+msgid "Cases by Court"
+msgstr "القضايا حسب المحكمة"
+
+#: apps/cases/stats_views.py:86
+msgid "Cases by Source"
+msgstr "القضايا حسب المصدر"
+
+#: apps/cases/templates/cases/case.html:25
+msgid "Court chamber"
+msgstr "الغرفة"
+
+#: apps/cases/templates/cases/case.html:31
+#: apps/search/templates/search/facets.html:91
+msgid "Decision type"
+msgstr "نوع القرار"
+
+#: apps/cases/templates/cases/case.html:45
+msgid "Source"
+msgstr "المصدر"
+
+#: apps/cases/templates/cases/case.html:46
+msgid "btn_go_to_source"
+msgstr "الانتقال إلى المصدر"
+
+#: apps/cases/templates/cases/case.html:50
+msgid "Found at"
+msgstr "موجود في"
+
+#: apps/cases/templates/cases/case.html:57
+msgid "PDF"
+msgstr "PDF"
+
+#: apps/cases/templates/cases/case.html:58
+msgid "Download"
+msgstr "تحميل"
+
+#: apps/cases/templates/cases/case.html:64
+#: apps/laws/templates/laws/law.html:57
+msgid "API"
+msgstr "واجهة البرمجة (API)"
+
+#: apps/cases/templates/cases/case.html:72
+msgid "ECLI"
+msgstr "ECLI"
+
+#: apps/cases/templates/cases/case.html:80
+msgid "Short-URL"
+msgstr "رابط مختصر"
+
+#: apps/cases/templates/cases/case.html:138
+#: apps/cases/templates/cases/stats/base.html:110
+#: apps/courts/templates/courts/cases_list.html:10
+#: apps/laws/templates/laws/law.html:72
+#: apps/processing/templates/admin/processing/dashboard.html:8
+msgid "Home"
+msgstr "الرئيسية"
+
+#: apps/cases/templates/cases/case.html:159
+msgid "private_content_warning"
+msgstr ""
+
+#: apps/cases/templates/cases/case.html:177
+msgid "btn_show_full_text"
+msgstr "عرض النص الكامل"
+
+#: apps/cases/templates/cases/case.html:195
+msgid "Cited by"
+msgstr "مستشهد به في"
+
+#: apps/cases/templates/cases/case.html:201
+#: apps/laws/templates/laws/references.html:52
+msgid "Open citing-cases search"
+msgstr "فتح البحث عن القضايا المستشهِدة"
+
+#: apps/cases/templates/cases/case.html:213
+#: apps/courts/templates/courts/cases_list.html:65
+#: apps/laws/templates/laws/references.html:64
+#, python-format
+msgid "Show all %(cases_count)s cases ..."
+msgstr "عرض كل القضايا (%(cases_count)s) ..."
+
+#: apps/cases/templates/cases/case.html:219
+msgid "No other cases cite this decision yet."
+msgstr "لا توجد قضايا أخرى تستشهد بهذا القرار بعد."
+
+#: apps/cases/templates/cases/case_filter.html:21
+#: apps/courts/templates/courts/court_filter.html:23
+msgid "Apply filters"
+msgstr "تطبيق المرشحات"
+
+#: apps/cases/templates/cases/case_filter.html:26
+#: apps/courts/templates/courts/court_filter.html:28
+msgid "Reset"
+msgstr "إعادة تعيين"
+
+#: apps/cases/templates/cases/case_filter.html:33
+#, python-format
+msgid ""
+"\n"
+"You can download the search results over our <a href=\"%(api_info_url)s\">REST-API</a>\n"
+"as <a href=\"%(api_url)s&format=json\">JSON</a> or <a href=\"%(api_url)s&format=xml\">XML</a> files.\n"
+msgstr ""
+
+#: apps/cases/templates/cases/stats/base.html:17
+#: apps/cases/templates/cases/stats/base.html:116
+#: apps/cases/templates/cases/stats/base.html:119 apps/sources/views.py:83
+#: assets/templates/footer.html:21
+msgid "Statistics"
+msgstr "إحصائيات"
+
+#: apps/cases/templates/cases/stats/base.html:21
+msgid "Overview"
+msgstr "نظرة عامة"
+
+#: apps/cases/templates/cases/stats/base.html:24
+#: apps/cases/templates/cases/stats/overview.html:17
+msgid "By Country"
+msgstr "حسب البلد"
+
+#: apps/cases/templates/cases/stats/base.html:27
+#: apps/cases/templates/cases/stats/overview.html:26
+msgid "By State"
+msgstr "حسب الجهة"
+
+#: apps/cases/templates/cases/stats/base.html:30
+#: apps/cases/templates/cases/stats/overview.html:35
+msgid "By Court"
+msgstr "حسب المحكمة"
+
+#: apps/cases/templates/cases/stats/base.html:34
+#: apps/cases/templates/cases/stats/overview.html:45
+msgid "By Source"
+msgstr "حسب المصدر"
+
+#: apps/cases/templates/cases/stats/base.html:42
+msgid "Filters"
+msgstr "المرشحات"
+
+#: apps/cases/templates/cases/stats/base.html:48
+#: apps/lib/templates/widgets/bootstrap_date_range.html:7
+msgid "After"
+msgstr "بعد"
+
+#: apps/cases/templates/cases/stats/base.html:54
+#: apps/lib/templates/widgets/bootstrap_date_range.html:7
+msgid "Before"
+msgstr "قبل"
+
+#: apps/cases/templates/cases/stats/base.html:59
+#: apps/lib/templates/widgets/bootstrap_date_range.html:15
+#: apps/sources/views.py:26
+msgid "Last month"
+msgstr "الشهر الأخير"
+
+#: apps/cases/templates/cases/stats/base.html:61
+#: apps/lib/templates/widgets/bootstrap_date_range.html:17
+msgid "Last year"
+msgstr "السنة الأخيرة"
+
+#: apps/cases/templates/cases/stats/base.html:63
+msgid "Last 5 years"
+msgstr "السنوات الخمس الأخيرة"
+
+#: apps/cases/templates/cases/stats/base.html:65
+msgid "All time"
+msgstr "كل الفترات"
+
+#: apps/cases/templates/cases/stats/base.html:70
+msgid "Group by"
+msgstr "تجميع حسب"
+
+#: apps/cases/templates/cases/stats/base.html:72
+msgid "Month"
+msgstr "الشهر"
+
+#: apps/cases/templates/cases/stats/base.html:73
+msgid "Year"
+msgstr "السنة"
+
+#: apps/cases/templates/cases/stats/base.html:74
+msgid "Day"
+msgstr "اليوم"
+
+#: apps/cases/templates/cases/stats/base.html:82
+msgid "Select a state"
+msgstr "اختر جهة"
+
+#: apps/cases/templates/cases/stats/base.html:92
+msgid "Apply"
+msgstr "تطبيق"
+
+#: apps/cases/templates/cases/stats/base.html:100
+msgid "Download (JSON)"
+msgstr "تحميل (JSON)"
+
+#: apps/cases/templates/cases/stats/base.html:135
+msgid "Loading statistics..."
+msgstr "جارٍ تحميل الإحصائيات..."
+
+#: apps/cases/templates/cases/stats/base.html:167 apps/sources/views.py:34
+msgid "Total"
+msgstr "المجموع"
+
+#: apps/cases/templates/cases/stats/base.html:168
+msgid "cases"
+msgstr "قضايا"
+
+#: apps/cases/templates/cases/stats/base.html:169
+msgid "Date"
+msgstr "التاريخ"
+
+#: apps/cases/templates/cases/stats/base.html:170
+msgid "Count"
+msgstr "العدد"
+
+#: apps/cases/templates/cases/stats/base.html:173
+msgid "Error loading statistics"
+msgstr "خطأ في تحميل الإحصائيات"
+
+#: apps/cases/templates/cases/stats/base.html:174
+msgid "Please select a state to view court statistics."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/base.html:176
+msgid "yearly"
+msgstr "سنوي"
+
+#: apps/cases/templates/cases/stats/base.html:177
+msgid "monthly"
+msgstr "شهري"
+
+#: apps/cases/templates/cases/stats/base.html:178
+msgid "daily"
+msgstr "يومي"
+
+#: apps/cases/templates/cases/stats/by_country.html:6
+msgid ""
+"Cases grouped by country. Each bar segment represents a different country. "
+"The table below shows the total count per country."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/by_court.html:6
+msgid ""
+"Cases grouped by court. Select a state from the sidebar to view the courts "
+"within that state. Each bar segment represents a different court."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/by_source.html:6
+msgid ""
+"Cases grouped by data source. Each bar segment represents a different "
+"source. The table below shows the total count per source."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/by_state.html:6
+msgid ""
+"Cases grouped by state. Each bar segment represents a different state. The "
+"table below shows the total count per state."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/overview.html:6
+msgid ""
+"This chart shows the total number of court cases published over time. Use "
+"the filters in the sidebar to adjust the date range and time granularity."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/overview.html:12
+msgid "Explore by Dimension"
+msgstr "الاستكشاف حسب البُعد"
+
+#: apps/cases/templates/cases/stats/overview.html:18
+msgid "See how cases are distributed across countries."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/overview.html:19
+#: apps/cases/templates/cases/stats/overview.html:28
+#: apps/cases/templates/cases/stats/overview.html:37
+#: apps/cases/templates/cases/stats/overview.html:47
+msgid "View"
+msgstr "عرض"
+
+#: apps/cases/templates/cases/stats/overview.html:27
+msgid "Compare case volumes across states."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/overview.html:36
+msgid "Drill down into individual courts within a state."
+msgstr ""
+
+#: apps/cases/templates/cases/stats/overview.html:46
+msgid "See which data sources contribute the most cases."
+msgstr ""
+
+#: apps/cases/views.py:34
+msgid "Case"
+msgstr "قضية"
+
+#: apps/contact/forms.py:23
+msgid "Invalid input."
+msgstr "مدخل غير صالح."
+
+#: apps/contact/forms.py:28 apps/contact/forms.py:91
+msgid "Full name"
+msgstr "الاسم الكامل"
+
+#: apps/contact/forms.py:31 apps/contact/forms.py:95
+msgid "Email address"
+msgstr "البريد الإلكتروني"
+
+#: apps/contact/forms.py:36
+msgid "Write here your message!"
+msgstr "اكتب رسالتك هنا!"
+
+#: apps/contact/forms.py:37
+msgid "Message"
+msgstr "الرسالة"
+
+#: apps/contact/forms.py:45
+msgid "Captcha: Wie viele Monate hat ein Jahr?"
+msgstr ""
+
+#: apps/contact/forms.py:66 apps/contact/forms.py:121
+msgid "You have to write something!"
+msgstr "يجب أن تكتب شيئاً!"
+
+#: apps/contact/forms.py:70
+msgid "Sie müssen die Frage unter \"Captcha\" korrekt beantworten."
+msgstr ""
+
+#: apps/contact/forms.py:76
+msgid "Source URL"
+msgstr "رابط المصدر"
+
+#: apps/contact/forms.py:79
+msgid "Enter the URL of the page which contains the infringement"
+msgstr ""
+
+#: apps/contact/forms.py:82
+msgid "Type of infringement"
+msgstr "نوع الانتهاك"
+
+#: apps/contact/forms.py:84
+#: apps/homepage/templates/homepage/landing_page.html:126
+#: assets/templates/footer.html:15
+msgid "Privacy"
+msgstr "الخصوصية"
+
+#: apps/contact/forms.py:85
+msgid "Copyright Infringement"
+msgstr "انتهاك حقوق النشر"
+
+#: apps/contact/forms.py:100
+msgid "Please provide more details on your complaint."
+msgstr "يرجى تقديم مزيد من التفاصيل حول شكواك."
+
+#: apps/contact/forms.py:101
+msgid "Additional information"
+msgstr "معلومات إضافية"
+
+#: apps/contact/templates/contact/form.html:9
+#: apps/contact/templates/contact/thankyou.html:9 apps/contact/views.py:29
+#: apps/contact/views.py:63 apps/homepage/templates/homepage/index.html:113
+#: assets/templates/footer.html:13
+msgid "Contact"
+msgstr "اتصل بنا"
+
+#: apps/contact/templates/contact/form.html:19
+#: apps/contact/templates/contact/report_content.html:23
+msgid "Submit"
+msgstr "إرسال"
+
+#: apps/contact/templates/contact/report_content.html:9
+#: apps/contact/views.py:54 assets/templates/footer.html:17
+msgid "Report content"
+msgstr "الإبلاغ عن محتوى"
+
+#: apps/contact/templates/contact/report_content.html:12
+msgid ""
+"Use this form to report content that you believe infringes your or somebody "
+"else's rights."
+msgstr ""
+
+#: apps/courts/filters.py:42 apps/courts/views.py:19
+msgid "Court title"
+msgstr "اسم المحكمة"
+
+#: apps/courts/templates/courts/cases_list.html:40 apps/courts/views.py:21
+msgid "ECLI code"
+msgstr "رمز ECLI"
+
+#: apps/courts/templates/courts/cases_list.html:45
+msgid "View case statistics for courts in"
+msgstr ""
+
+#: apps/homepage/templates/errors/404.html:9
+#: apps/homepage/templates/errors/500.html:9
+#: apps/homepage/templates/errors/bad_request.html:9
+#: apps/homepage/templates/errors/permission_denied.html:9
+#: apps/homepage/views.py:79 apps/homepage/views.py:88
+#: apps/homepage/views.py:98 apps/homepage/views.py:109
+#: apps/search/templates/search/search.html:83
+msgid "Error"
+msgstr "خطأ"
+
+#: apps/homepage/templates/errors/404.html:9 apps/homepage/views.py:88
+msgid "Not found"
+msgstr "غير موجود"
+
+#: apps/homepage/templates/errors/404.html:12
+msgid "The requested content does not exist."
+msgstr "المحتوى المطلوب غير موجود."
+
+#: apps/homepage/templates/errors/404.html:15
+#: apps/homepage/templates/errors/500.html:16
+#: apps/homepage/templates/errors/bad_request.html:16
+#: apps/homepage/templates/errors/permission_denied.html:16
+msgid "Go back"
+msgstr "رجوع"
+
+#: apps/homepage/templates/errors/500.html:12
+msgid ""
+"Webservice currently unavailable. Our service team has been dispatched to "
+"bring it back online."
+msgstr ""
+
+#: apps/homepage/templates/errors/bad_request.html:9
+#: apps/homepage/views.py:109
+msgid "Bad request"
+msgstr "طلب غير صالح"
+
+#: apps/homepage/templates/errors/bad_request.html:12
+msgid "You sent an invalid request."
+msgstr "لقد أرسلت طلباً غير صالح."
+
+#: apps/homepage/templates/errors/permission_denied.html:9
+#: apps/homepage/views.py:98
+msgid "Permission denied"
+msgstr "تم رفض الإذن"
+
+#: apps/homepage/templates/errors/permission_denied.html:12
+msgid "You do not have sufficient rights for this action."
+msgstr "ليست لديك الصلاحيات الكافية لهذا الإجراء."
+
+#: apps/homepage/templates/homepage/banner.html:13
+msgid "homepage_banner_title"
+msgstr "وصول مجاني إلى المعلومات القانونية"
+
+#: apps/homepage/templates/homepage/banner.html:16
+msgid "homepage_banner_text1"
+msgstr ""
+"نوفر وصولاً مجانياً ومفتوحاً إلى الوثائق القانونية للعموم وللأنظمة الآلية."
+
+#: apps/homepage/templates/homepage/banner.html:19
+msgid "homepage_banner_text2"
+msgstr "تُضاف الوثائق الحديثة بانتظام إلى قاعدة بياناتنا."
+
+#: apps/homepage/templates/homepage/banner.html:28
+#: apps/search/templates/search/search.html:25
+#: assets/templates/includes/search_form.html:6
+msgid "search_query_placeholder"
+msgstr "قانون، كلمة مفتاحية، ..."
+
+#: apps/homepage/templates/homepage/banner.html:39
+#: apps/search/templates/search/empty_results.html:26
+msgid "search_example_queries"
+msgstr "أمثلة على البحث"
+
+#: apps/homepage/templates/homepage/banner.html:46
+#: apps/search/templates/search/empty_results.html:37
+msgid "search_example_query1"
+msgstr ""
+
+#: apps/homepage/templates/homepage/banner.html:47
+#: apps/search/templates/search/empty_results.html:38
+msgid "search_example_query2"
+msgstr ""
+
+#: apps/homepage/templates/homepage/banner.html:48
+#: apps/search/templates/search/empty_results.html:39
+msgid "search_example_query3"
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:14
+msgid "Getting Started with the API"
+msgstr "البدء مع واجهة البرمجة"
+
+#: apps/homepage/templates/homepage/index.html:17
+msgid ""
+"Our REST API allows you to view, create or edit content available on this "
+"site. Most read requests (e.g. view cases) do not need to be authenticated, "
+"but any action that would require a user to be logged in (such as creating "
+"annotations) requires an API key."
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:24
+#, python-format
+msgid ""
+"To make authenticated requests, you'll need to <a "
+"href=\"%(signup_url)s\">set up an account</a> and obtain your <a "
+"href=\"%(api_url)s\">API key</a>."
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:29
+msgid "We have different endpoints for cases, laws, courts and more."
+msgstr "نوفر نقاط وصول مختلفة للقضايا والقوانين والمحاكم وغيرها."
+
+#: apps/homepage/templates/homepage/index.html:33
+msgid ""
+"Several API Clients are available in <a "
+"href=\"http://github.com/openlegaldata/oldp-sdk-python\">Python</a>, <a "
+"href=\"http://github.com/openlegaldata/oldp-sdk-php\">PHP</a>, <a "
+"href=\"http://github.com/openlegaldata/oldp-sdk-java\">Java</a> and <a "
+"href=\"http://github.com/openlegaldata/oldp-sdk-javascript\">Javascript</a>."
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:45
+#, python-format
+msgid ""
+"The <a href=\"%(redoc_url)s\">full documentation</a> is a great way to "
+"explore all the features of the API. You might also want to check out our <a"
+" href=\"https://github.com/openlegaldata/oldp-notebooks\">example apps</a>."
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:53
+#, python-format
+msgid ""
+"Questions? Comments? Want to tell us about the cool stuff you've built with "
+"our API? <a href=\"%(contact_url)s\">Get in touch</a>."
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:61
+msgid "Try it out!"
+msgstr "جرّبها!"
+
+#: apps/homepage/templates/homepage/index.html:62
+msgid "Documentation"
+msgstr "التوثيق"
+
+#: apps/homepage/templates/homepage/index.html:63
+msgid "Examples"
+msgstr "أمثلة"
+
+#: apps/homepage/templates/homepage/index.html:70
+msgid "Latest Cases"
+msgstr "أحدث القضايا"
+
+#: apps/homepage/templates/homepage/index.html:81
+msgid "View all cases"
+msgstr "عرض كل القضايا"
+
+#: apps/homepage/templates/homepage/index.html:88
+msgid "Contribute"
+msgstr "ساهم"
+
+#: apps/homepage/templates/homepage/index.html:91
+msgid ""
+"Open Legal Data is a non-profit initiative by volunteers. Our initiative was"
+" founded to provide free, public, and open access to legal documents for "
+"educational, charitable, and scientific purposes to the benefit of the "
+"general public and the public interest."
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:97
+msgid ""
+"We develop technologies such as this platform to facilitate legal research."
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:103
+msgid ""
+"Yet, we depend on your support and, therefore, do not hesitate to send us "
+"your feedback or comments. Contributions are needed and always welcome!"
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:111
+#: apps/homepage/templates/homepage/landing_page.html:130
+msgid "Twitter"
+msgstr ""
+
+#: apps/homepage/templates/homepage/index.html:112
+#: apps/homepage/templates/homepage/landing_page.html:131
+msgid "GitHub"
+msgstr ""
+
+#: apps/homepage/templates/homepage/landing_page.html:15
+msgid "Free Access to Legal Information"
+msgstr "وصول مجاني إلى المعلومات القانونية"
+
+#: apps/homepage/templates/homepage/landing_page.html:17
+msgid ""
+"Our open data platform is currently available for the following countries:"
+msgstr ""
+
+#: apps/homepage/templates/homepage/landing_page.html:22
+msgid "Germany / Deutschland"
+msgstr ""
+
+#: apps/homepage/templates/homepage/landing_page.html:36
+msgid ""
+"<strong>OPENLEGALDATA.IO</strong> is a free and open platform that makes "
+"legal documents and information accessible to the public. Our goal is to "
+"enhance the transparency of the jurisdiction with the help of open data and "
+"by supporting people without legal education to understand the justice "
+"system. The project is committed to the Open Data Principles and the Free "
+"Access to Law Movement."
+msgstr ""
+
+#: apps/homepage/templates/homepage/landing_page.html:43
+msgid "Read more about the project."
+msgstr "اقرأ المزيد عن المشروع."
+
+#: apps/homepage/templates/homepage/landing_page.html:55
+msgid "Increase Transparency"
+msgstr "تعزيز الشفافية"
+
+#: apps/homepage/templates/homepage/landing_page.html:65
+msgid "Join the team!"
+msgstr "انضم إلى الفريق!"
+
+#: apps/homepage/templates/homepage/landing_page.html:75
+msgid "Open Data"
+msgstr "بيانات مفتوحة"
+
+#: apps/homepage/templates/homepage/landing_page.html:86
+msgid "Legal Research"
+msgstr "البحث القانوني"
+
+#: apps/homepage/templates/homepage/landing_page.html:96
+msgid "Our Blog"
+msgstr "مدونتنا"
+
+#: apps/homepage/templates/homepage/landing_page.html:108
+msgid "Show more posts"
+msgstr "عرض المزيد من المقالات"
+
+#: apps/homepage/templates/homepage/landing_page.html:124
+msgid "About"
+msgstr "حول"
+
+#: apps/homepage/templates/homepage/landing_page.html:125
+#: assets/templates/footer.html:14
+msgid "Imprint"
+msgstr "إشعار قانوني"
+
+#: apps/homepage/templates/homepage/landing_page.html:128
+msgid "Blog"
+msgstr "المدونة"
+
+#: apps/homepage/views.py:20
+msgid "View all laws"
+msgstr "عرض كل القوانين"
+
+#: apps/homepage/views.py:67
+msgid "Free Access to Legal Data"
+msgstr "وصول مجاني إلى البيانات القانونية"
+
+#: apps/laws/models.py:26
+msgid "Revision date cannot be in the future."
+msgstr ""
+
+#: apps/laws/models.py:29
+msgid ""
+"Revision date cannot be before 1800 (unreasonably old for German laws)."
+msgstr ""
+
+#: apps/laws/search_indexes.py:11
+msgid "Law"
+msgstr "قانون"
+
+#: apps/laws/serializers.py:127 apps/laws/serializers.py:206
+msgid "Book code cannot be empty."
+msgstr ""
+
+#: apps/laws/serializers.py:133
+msgid "Book title cannot be empty."
+msgstr ""
+
+#: apps/laws/serializers.py:212
+msgid "Section cannot be empty."
+msgstr ""
+
+#: apps/laws/templates/laws/book.html:33 apps/laws/templates/laws/law.html:37
+msgid "Changelog"
+msgstr "سجل التغييرات"
+
+#: apps/laws/templates/laws/book.html:41 apps/laws/templates/laws/law.html:43
+msgid "Revisions"
+msgstr "المراجعات"
+
+#: apps/laws/templates/laws/book.html:44 apps/laws/templates/laws/law.html:47
+msgid "selected"
+msgstr "محدد"
+
+#: apps/laws/templates/laws/book.html:49 apps/laws/templates/laws/law.html:52
+msgid "btn_show_all"
+msgstr "عرض الكل"
+
+#: apps/laws/templates/laws/index.html:24
+msgid "More Laws"
+msgstr "المزيد من القوانين"
+
+#: apps/laws/templates/laws/law.html:90 assets/templates/account/email.html:62
+msgid "Warning:"
+msgstr "تنبيه:"
+
+#: apps/laws/templates/laws/law.html:90
+msgid "law_outdated_warning"
+msgstr ""
+"قد يكون نص هذا القانون قديماً لأن المحتوى غير محدَّث باستمرار. يرجى التحقق "
+"من المصادر الرسمية."
+
+#: apps/laws/templates/laws/law.html:95
+#, python-format
+msgid ""
+"You are currently viewing an <strong>outdated revision</strong> of this law."
+" Click <a href=\"%(url)s\">here</a> to view the latest revision."
+msgstr ""
+
+#: apps/laws/templates/laws/law.html:126
+msgid "This law is deprecated."
+msgstr "هذا القانون ملغى."
+
+#: apps/laws/templates/laws/references.html:21
+#: apps/references/templates/references.html:21
+msgid "not assigned"
+msgstr "غير محدد"
+
+#: apps/laws/templates/laws/references.html:30
+msgid "This document does not contain any references."
+msgstr "لا تحتوي هذه الوثيقة على أي مراجع."
+
+#: apps/laws/templates/laws/references.html:36
+msgid "Referenced by"
+msgstr "مُشار إليه في"
+
+#: apps/laws/templates/laws/references.html:70
+msgid "No cases cite this section yet."
+msgstr "لا توجد قضايا تستشهد بهذه المادة بعد."
+
+#: apps/laws/views.py:150
+#, python-format
+msgid ""
+"The requested revision (%s) was not found. Showing instead the latest "
+"revision."
+msgstr ""
+
+#: apps/lib/filters.py:18
+msgid "descending"
+msgstr "تنازلي"
+
+#: apps/lib/tests/test_filters.py:64
+msgid "Name Field"
+msgstr ""
+
+#: apps/lib/tests/test_filters.py:77
+msgid "Name (Z-A)"
+msgstr "الاسم (ي-أ)"
+
+#: apps/lib/widgets.py:37
+msgid "All"
+msgstr "الكل"
+
+#: apps/references/templates/references.html:30
+msgid "This content does not contain any references."
+msgstr "لا يحتوي هذا المحتوى على أي مراجع."
+
+#: apps/search/templates/search/empty_results.html:4
+msgid "No results"
+msgstr "لا توجد نتائج"
+
+#: apps/search/templates/search/empty_results.html:7
+#, python-format
+msgid "Your search <strong>%(query)s</strong> did not match any documents."
+msgstr "لم يطابق بحثك <strong>%(query)s</strong> أي وثيقة."
+
+#: apps/search/templates/search/empty_results.html:10
+msgid "Suggestions"
+msgstr "اقتراحات"
+
+#: apps/search/templates/search/empty_results.html:13
+msgid "Make sure that all words are spelled correctly."
+msgstr "تأكد من أن جميع الكلمات مكتوبة بشكل صحيح."
+
+#: apps/search/templates/search/empty_results.html:16
+msgid "Try different keywords."
+msgstr "جرّب كلمات مفتاحية مختلفة."
+
+#: apps/search/templates/search/empty_results.html:19
+msgid "Try more general keywords."
+msgstr "جرّب كلمات مفتاحية أكثر عمومية."
+
+#: apps/search/templates/search/empty_results.html:22
+msgid "Try fewer keywords."
+msgstr "جرّب عدداً أقل من الكلمات المفتاحية."
+
+#: apps/search/templates/search/facets.html:22
+msgid "No filter available."
+msgstr "لا توجد مرشحات متاحة."
+
+#: apps/search/templates/search/facets.html:26
+msgid "Sort by"
+msgstr "ترتيب حسب"
+
+#: apps/search/templates/search/facets.html:33
+msgid "Relevance"
+msgstr "الأهمية"
+
+#: apps/search/templates/search/facets.html:41
+msgid "Date (newest first)"
+msgstr "التاريخ (الأحدث أولاً)"
+
+#: apps/search/templates/search/facets.html:49
+msgid "Most cited first"
+msgstr "الأكثر استشهاداً أولاً"
+
+#: apps/search/templates/search/facets.html:58
+msgid "Document type"
+msgstr "نوع الوثيقة"
+
+#: apps/search/templates/search/facets.html:71
+msgid "Law book"
+msgstr "مدونة القوانين"
+
+#: apps/search/templates/search/search.html:30 apps/search/views.py:334
+#: apps/search/views.py:393
+msgid "Search"
+msgstr "بحث"
+
+#: apps/search/templates/search/search.html:38
+msgid "Search tips"
+msgstr "نصائح للبحث"
+
+#: apps/search/templates/search/search.html:40
+msgid "<b>Exact phrase</b>: put it in quotes — <code>\"Treu und Glauben\"</code>."
+msgstr ""
+
+#: apps/search/templates/search/search.html:41
+msgid ""
+"<b>Exclude a word</b>: prefix it with a minus — <code>Kündigung "
+"-Strafrecht</code>."
+msgstr ""
+
+#: apps/search/templates/search/search.html:43
+msgid ""
+"German word forms, umlauts and ß are matched automatically — you don't need "
+"the exact spelling."
+msgstr ""
+
+#: apps/search/templates/search/search.html:60
+msgid "Cases citing"
+msgstr "القضايا التي تستشهد بـ"
+
+#: apps/search/templates/search/search.html:62
+msgid "Cases citing case"
+msgstr "القضايا التي تستشهد بالقضية"
+
+#: apps/search/templates/search/search.html:68
+msgid "(unknown)"
+msgstr "(غير معروف)"
+
+#: apps/search/templates/search/search.html:72
+msgid "Remove filter"
+msgstr "إزالة المرشح"
+
+#: apps/search/templates/search/search.html:91
+#, python-format
+msgid "%(count)s citing cases, sorted by <b>date</b>."
+msgstr "%(count)s قضية مستشهِدة، مرتبة حسب <b>التاريخ</b>."
+
+#: apps/search/templates/search/search.html:93
+#, python-format
+msgid "%(count)s citing cases, sorted by <b>relevance</b>."
+msgstr "%(count)s قضية مستشهِدة، مرتبة حسب <b>الأهمية</b>."
+
+#: apps/search/templates/search/search.html:96
+#, python-format
+msgid "%(count)s documents sorted by <b>date</b>."
+msgstr "%(count)s وثيقة مرتبة حسب <b>التاريخ</b>."
+
+#: apps/search/templates/search/search.html:98
+#, python-format
+msgid "%(count)s documents sorted by <b>most cited</b>."
+msgstr "%(count)s وثيقة مرتبة حسب <b>الأكثر استشهاداً</b>."
+
+#: apps/search/templates/search/search.html:100
+#, python-format
+msgid "%(count)s documents sorted by <b>relevance</b>."
+msgstr "%(count)s وثيقة مرتبة حسب <b>الأهمية</b>."
+
+#: apps/search/utils.py:377
+msgid ""
+"Search backend is currently unavailable, so the list of citing cases cannot "
+"be loaded. Please try again later."
+msgstr ""
+
+#: apps/search/views.py:324
+msgid ""
+"Search timed out. The first request after a cold start can be slow — please "
+"try again."
+msgstr ""
+
+#: apps/search/views.py:329
+msgid "Search is currently unavailable. Please try again later."
+msgstr "البحث غير متاح حالياً. يرجى المحاولة لاحقاً."
+
+#: apps/sources/templates/sources/stats.html:10
+msgid "Source: Statistics"
+msgstr ""
+
+#: apps/sources/views.py:16
+msgid "Last day"
+msgstr "اليوم الأخير"
+
+#: apps/sources/views.py:21
+msgid "Last week"
+msgstr "الأسبوع الأخير"
+
+#: apps/sources/views.py:31
+msgid "Last three month"
+msgstr "الأشهر الثلاثة الأخيرة"
+
+#: assets/templates/account/base.html:20
+msgid "E-mail Addresses"
+msgstr ""
+
+#: assets/templates/account/base.html:23
+#: assets/templates/account/password_change.html:6
+#: assets/templates/account/password_change.html:14
+#: assets/templates/account/password_reset_from_key.html:6
+#: assets/templates/account/password_reset_from_key.html:11
+#: assets/templates/account/password_reset_from_key.html:23
+#: assets/templates/header.html:45
+msgid "Change Password"
+msgstr ""
+
+#: assets/templates/account/base.html:26
+msgid "Personal Tokens"
+msgstr ""
+
+#: assets/templates/account/base.html:29
+msgid "Application Tokens"
+msgstr ""
+
+#: assets/templates/account/base.html:34
+msgid "Connected Accounts"
+msgstr ""
+
+#: assets/templates/account/email.html:13
+msgid "The following e-mail addresses are associated to your account:"
+msgstr ""
+
+#: assets/templates/account/email.html:22
+msgid "E-mail"
+msgstr ""
+
+#: assets/templates/account/email.html:41
+msgid "Verified"
+msgstr ""
+
+#: assets/templates/account/email.html:43
+msgid "Unverified"
+msgstr ""
+
+#: assets/templates/account/email.html:45
+msgid "Primary"
+msgstr ""
+
+#: assets/templates/account/email.html:53
+msgid "Make Primary"
+msgstr ""
+
+#: assets/templates/account/email.html:54
+msgid "Re-send Verification"
+msgstr ""
+
+#: assets/templates/account/email.html:55
+#: assets/templates/socialaccount/connections.html:41
+msgid "Remove"
+msgstr "إزالة"
+
+#: assets/templates/account/email.html:62
+msgid ""
+"You currently do not have any e-mail address set up. You should really add "
+"an e-mail address so you can receive notifications, reset your password, "
+"etc."
+msgstr ""
+
+#: assets/templates/account/email.html:67
+msgid "Add E-mail Address"
+msgstr ""
+
+#: assets/templates/account/email.html:73
+msgid "Add E-mail"
+msgstr ""
+
+#: assets/templates/account/email.html:84
+msgid "Do you really want to remove the selected e-mail address?"
+msgstr ""
+
+#: assets/templates/account/email_confirm.html:6
+#: assets/templates/account/email_confirm.html:11
+msgid "Confirm E-mail Address"
+msgstr ""
+
+#: assets/templates/account/email_confirm.html:17
+#, python-format
+msgid ""
+"Please confirm that <a href=\"mailto:%(email)s\">%(email)s</a> is an e-mail "
+"address for user %(user_display)s."
+msgstr ""
+
+#: assets/templates/account/email_confirm.html:21
+msgid "Confirm"
+msgstr "تأكيد"
+
+#: assets/templates/account/email_confirm.html:28
+#, python-format
+msgid ""
+"This e-mail confirmation link expired or is invalid. Please <a "
+"href=\"%(email_url)s\">issue a new e-mail confirmation request</a>."
+msgstr ""
+
+#: assets/templates/account/login.html:7
+#: assets/templates/account/login.html:12
+#: assets/templates/account/login.html:28 assets/templates/header.html:37
+msgid "Sign In"
+msgstr "تسجيل الدخول"
+
+#: assets/templates/account/login.html:17
+msgid "or sign in with your email"
+msgstr ""
+
+#: assets/templates/account/login.html:29
+msgid "Forgot Password?"
+msgstr ""
+
+#: assets/templates/account/logout.html:5
+#: assets/templates/account/logout.html:9
+#: assets/templates/account/logout.html:18 assets/templates/header.html:53
+msgid "Sign Out"
+msgstr "تسجيل الخروج"
+
+#: assets/templates/account/logout.html:11
+msgid "Are you sure you want to sign out?"
+msgstr ""
+
+#: assets/templates/account/password_reset.html:8
+#: assets/templates/account/password_reset.html:12
+msgid "Password Reset"
+msgstr ""
+
+#: assets/templates/account/password_reset.html:17
+msgid ""
+"Forgotten your password? Enter your e-mail address below, and we'll send you"
+" an e-mail allowing you to reset it."
+msgstr ""
+
+#: assets/templates/account/password_reset.html:23
+msgid "Reset My Password"
+msgstr ""
+
+#: assets/templates/account/password_reset.html:27
+msgid "Please contact us if you have any trouble resetting your password."
+msgstr ""
+
+#: assets/templates/account/password_reset_from_key.html:11
+msgid "Bad Token"
+msgstr ""
+
+#: assets/templates/account/password_reset_from_key.html:15
+#, python-format
+msgid ""
+"The password reset link was invalid, possibly because it has already been "
+"used.  Please request a <a href=\"%(passwd_reset_url)s\">new password "
+"reset</a>."
+msgstr ""
+
+#: assets/templates/account/password_reset_from_key.html:27
+msgid "Your password is now changed."
+msgstr ""
+
+#: assets/templates/account/password_set.html:6
+#: assets/templates/account/password_set.html:14
+msgid "Set Password"
+msgstr ""
+
+#: assets/templates/account/signup.html:7
+msgid "Signup"
+msgstr "إنشاء حساب"
+
+#: assets/templates/account/signup.html:11
+#: assets/templates/account/signup.html:28 assets/templates/header.html:56
+msgid "Sign Up"
+msgstr "إنشاء حساب"
+
+#: assets/templates/account/signup.html:13
+#, python-format
+msgid ""
+"Already have an account? Then please <a href=\"%(login_url)s\">sign in</a>."
+msgstr ""
+
+#: assets/templates/account/signup.html:18
+msgid "or sign up with your email"
+msgstr ""
+
+#: assets/templates/account/snippets/social_buttons.html:58
+#, python-format
+msgid "Continue with %(name)s"
+msgstr ""
+
+#: assets/templates/account/verification_sent.html:5
+#: assets/templates/account/verification_sent.html:9
+#: assets/templates/account/verified_email_required.html:5
+#: assets/templates/account/verified_email_required.html:9
+msgid "Verify Your E-mail Address"
+msgstr ""
+
+#: assets/templates/account/verification_sent.html:11
+msgid ""
+"We have sent an e-mail to you for verification. Follow the link provided to "
+"finalize the signup process. Please contact us if you do not receive it "
+"within a few minutes."
+msgstr ""
+
+#: assets/templates/account/verified_email_required.html:13
+msgid ""
+"This part of the site requires us to verify that\n"
+"        you are who you claim to be. For this purpose, we require that you\n"
+"        verify ownership of your e-mail address. "
+msgstr ""
+
+#: assets/templates/account/verified_email_required.html:17
+msgid ""
+"We have sent an e-mail to you for\n"
+"        verification. Please click on the link inside this e-mail. Please\n"
+"        contact us if you do not receive it within a few minutes."
+msgstr ""
+
+#: assets/templates/account/verified_email_required.html:21
+#, python-format
+msgid ""
+"<strong>Note:</strong> you can still <a href=\"%(email_url)s\">change your "
+"e-mail address</a>."
+msgstr ""
+
+#: assets/templates/admin/index.html:18
+msgid "Creation Dashboards"
+msgstr ""
+
+#: assets/templates/admin/index.html:21 assets/templates/admin/index.html:25
+#: assets/templates/admin/index.html:29 assets/templates/admin/index.html:33
+msgid "Creation statistics, API submissions and pending approvals"
+msgstr ""
+
+#: assets/templates/admin/index.html:45
+msgid "Recent actions"
+msgstr ""
+
+#: assets/templates/admin/index.html:46
+msgid "My actions"
+msgstr ""
+
+#: assets/templates/admin/index.html:49
+msgid "None available"
+msgstr ""
+
+#: assets/templates/admin/index.html:54
+msgid "Added:"
+msgstr ""
+
+#: assets/templates/admin/index.html:54
+msgid "Changed:"
+msgstr ""
+
+#: assets/templates/admin/index.html:54
+msgid "Deleted:"
+msgstr ""
+
+#: assets/templates/admin/index.html:64
+msgid "Unknown content"
+msgstr ""
+
+#: assets/templates/footer.html:16
+msgid "Terms"
+msgstr "الشروط"
+
+#: assets/templates/header.html:44
+msgid "API Keys"
+msgstr ""
+
+#: assets/templates/header.html:46
+msgid "Change E-mail"
+msgstr ""
+
+#: assets/templates/header.html:55
+msgid "Login"
+msgstr "تسجيل الدخول"
+
+#: assets/templates/noresults.html:4
+msgid "Sorry, we could not find any results."
+msgstr "عذراً، لم نعثر على أي نتائج."
+
+#: assets/templates/oauth2_provider/authorize.html:10
+#: assets/templates/oauth2_provider/authorize.html:71
+msgid "Authorization error"
+msgstr ""
+
+#: assets/templates/oauth2_provider/authorize.html:10
+#: assets/templates/oauth2_provider/authorize.html:63
+msgid "Authorize"
+msgstr ""
+
+#: assets/templates/oauth2_provider/authorize.html:27
+#, python-format
+msgid "Authorize <strong>%(name)s</strong>?"
+msgstr ""
+
+#: assets/templates/oauth2_provider/authorize.html:30
+#, python-format
+msgid "<strong>%(name)s</strong> wants to access your %(site)s account."
+msgstr ""
+
+#: assets/templates/oauth2_provider/authorize.html:36
+msgid "Signed in as"
+msgstr ""
+
+#: assets/templates/oauth2_provider/authorize.html:40
+msgid "This application will be able to:"
+msgstr ""
+
+#: assets/templates/oauth2_provider/authorize.html:57
+msgid "You can revoke this access at any time."
+msgstr ""
+
+#: assets/templates/oauth2_provider/authorize.html:78
+msgid "Back to homepage"
+msgstr "العودة إلى الصفحة الرئيسية"
+
+#: assets/templates/pagination_list_view.html:42
+#, python-format
+msgid "%(start)s-%(end)s of > %(max_count)s items"
+msgstr "%(start)s-%(end)s من أكثر من %(max_count)s عنصر"
+
+#: assets/templates/pagination_list_view.html:44
+#, python-format
+msgid "%(start)s-%(end)s of %(count)s items"
+msgstr "%(start)s-%(end)s من %(count)s عنصر"
+
+#: assets/templates/socialaccount/connections.html:6
+#: assets/templates/socialaccount/connections.html:12
+msgid "Account Connections"
+msgstr ""
+
+#: assets/templates/socialaccount/connections.html:26
+msgid ""
+"You can sign in to your account using any of the following third-party "
+"accounts:"
+msgstr ""
+
+#: assets/templates/socialaccount/connections.html:44
+msgid "You currently have no third-party accounts connected to this account."
+msgstr ""
+
+#: assets/templates/socialaccount/connections.html:51
+msgid "Add a third-party account"
+msgstr ""
+
+#: assets/templates/socialaccount/connections.html:57
+#, python-format
+msgid "Connect %(name)s"
+msgstr ""
+
+#: assets/templates/socialaccount/connections.html:62
+msgid "No third-party providers are available."
+msgstr ""
+
+#: settings.py:435
+msgid "English"
+msgstr "الإنجليزية"
+
+#: settings.py:436
+msgid "German"
+msgstr "الألمانية"
+
+#: settings.py:437
+msgid "Arabic"
+msgstr "العربية"
+
+#: settings.py:781
+msgid "Read access to legal data"
+msgstr ""

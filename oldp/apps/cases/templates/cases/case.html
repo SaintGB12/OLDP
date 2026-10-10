@@ -1,0 +1,224 @@
+{% extends 'layout.html' %}
+
+{% load static %}
+{% load i18n %}
+{% load html_filters %}
+
+{% block search_form %}
+    {% with sidebar=1 sidebar_toggle_icon='fa-info-circle' %}
+        {% include 'includes/search_form.html' %}
+    {% endwith %}
+{% endblock %}
+
+{% block sidebar %}
+    <nav class="collapse nav-sidebar" id="sidebar">
+
+        <div class="meta-data">
+
+            <div class="meta-item-2c">
+                <label>{% trans 'Court' %}:</label>
+                <div class="meta-value"><a href="{{ item.court.get_absolute_url }}">{{ item.court.name }}</a></div>
+            </div>
+
+            {% if item.court_chamber %}
+                <div class="meta-item-2c">
+                    <label>{% trans 'Court chamber' %}: </label>
+                    <div class="meta-value">{{ item.court_chamber }}</div>
+                </div>
+            {% endif %}
+
+            <div class="meta-item-2c">
+                <label>{% trans 'Decision type' %}: </label><div class="meta-value">{{ item.get_case_type }}</div>
+            </div>
+
+
+            <div class="meta-item-2c">
+                <label>{% trans 'Published on' %}: </label><div class="meta-value">{{ item.get_date }}</div>
+            </div>
+
+            <div class="meta-item-2c">
+                <label>{% trans 'File number' %}: </label><div class="meta-value">{{ item.file_number }}</div>
+            </div>
+
+            {% if user.is_staff or not item.source.private %}
+                <div class="meta-item-2c">
+                    <label>{% trans 'Source' %}: </label>
+                    <div class="meta-value"><a href="{{ item.source_url }}" target="_blank" class="">{% trans 'btn_go_to_source' %}</a></div>
+                </div>
+
+                <div class="meta-item-2c">
+                    <label>{% trans 'Found at' %}: </label>
+                    <div class="meta-value"><a href="{{ item.source.homepage }}" target="_blank">{{ item.source.name }}</a></div>
+                </div>
+            {% endif %}
+
+            {% if item.source_file %}
+            <div class="meta-item-2c">
+                <label>{% trans 'PDF' %}: </label>
+                <div class="meta-value"><a href="{{ item.source_file.url }}">{% trans "Download" %}</a></div>
+            </div>
+            {% endif %}
+
+
+            <div class="meta-item-2c">
+                <label for="permalink">{% trans 'API' %}: </label>
+                <div class="meta-value">
+                    <a href="{{ item.get_api_url }}" rel="nofollow"><i class="fa fa-file"></i> JSON</a>
+                </div>
+            </div>
+
+            {% if item.ecli %}
+                <div class="meta-item">
+                    <label for="ecli">{% trans 'ECLI' %}: </label>
+                    <div class="meta-value">
+                        <input id="ecli" class="form-control" readonly type="text" value="{{ item.ecli }}" onclick="this.select();">
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="meta-item">
+                <label for="permalink">{% trans 'Short-URL' %}: </label>
+                <div class="meta-value">
+                    <input id="permalink" class="form-control" readonly type="text" value="{{ item.get_short_url }}" onclick="this.select();">
+                </div>
+            </div>
+
+            {% if user.is_staff %}
+                <hr>
+
+                <p>
+                    <b>Named Entities:</b>
+                </p>
+                <p>
+
+                    {% for type in item.get_entity_types %}
+                    <button class="btn btn-sm entity-{{ type }}" onclick="toggleEntityMarkers('{{ type }}');">
+                        <i class="fa fa-toggle-off" aria-hidden="true"></i>
+                        {% trans type %}
+                    </button>
+                    {% endfor %}
+
+                </p>
+
+                <hr>
+
+                <p>
+                    <b>Annotations:</b>
+                </p>
+                {% for slug, label in annotation_labels.items %}
+                    <div class="meta-item-2c">
+                        <label>{{ label.name }}: </label>
+                        <div class="meta-value">
+                            {{ label.annotations }}
+                        </div>
+                    </div>
+                {% endfor %}
+
+                <p>
+                    <b>Markers</b>
+                </p>
+                {% for marker in marker_labels %}
+                    <button class="btn btn-sm marker-label{{ marker.label__id }}" style="background-color: {{ marker.label__color }}" onclick="toggleMarkers('{{ marker.label__id }}');">
+                        <i class="fa fa-toggle-on" aria-hidden="true"></i>
+                        {{ marker.label__name  }}
+                    </button>
+                {% endfor %}
+
+            {% endif %}
+
+        </div>
+
+    </nav>
+{% endblock %}
+
+{% block breadcrumbs %}
+    <nav class="breadcrumbs d-none d-md-block">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <i class="fa fa-home"></i> <a href="{% url 'homepage:index' %}">{% trans 'Home' %}</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'cases:index' %}">{% trans 'Cases' %}</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{{ item.court.get_absolute_url }}">{{ item.court.name }}</a>
+        </li>
+        <li class="breadcrumb-item">{{ item.file_number }}</li>
+      </ol>
+    </nav>
+{% endblock %}
+
+{% block content %}
+
+{% with item=item %}
+    {% include 'admin_bar.html' %}
+{% endwith %}
+
+{% if item.is_private %}
+    <div class="alert alert-danger">
+        {% trans 'private_content_warning' %}
+    </div>
+{% endif %}
+
+<section class="case">
+
+    <div class="title-center">
+        <h2>{{ item.get_title }}</h2>
+    </div>
+    <div class="case-content">
+
+            <div class="read-more-container">
+                <div class="read-more-inner">
+                {{ content|sanitize_html }}
+                </div>
+                <div class="read-more">
+                    <button class="btn btn-success">
+                        <i class="fa fa-arrow-down"></i>
+                        {% trans 'btn_show_full_text' %}
+                        <i class="fa fa-arrow-down"></i>
+                    </button>
+                </div>
+            </div>
+
+    </div>
+</section>
+
+<section>
+    {% comment %}
+    Cited-by panel: cases that reference THIS case. Backed by the
+    cited_cases multi-value field on CaseIndex; ES is the sole source
+    of truth. On backend failure we render an explicit notice plus a
+    link to the search page — the equivalent panel on
+    /law/<book>/<sec>/ behaves identically.
+    {% endcomment %}
+    <h3>{% trans 'Cited by' %}</h3>
+
+    {% if referencing_cases_error %}
+        <div class="alert alert-warning">
+            <p>{{ referencing_cases_error }}</p>
+            <a href="{{ referencing_cases_search_url }}" class="btn btn-sm btn-primary">
+                {% trans 'Open citing-cases search' %}
+            </a>
+        </div>
+    {% elif referencing_cases_count %}
+        {% with cases=referencing_cases %}
+            {% include 'cases/table.html' %}
+        {% endwith %}
+
+        <nav class="text-center" aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                <li class="page-item">
+                    <a class="page-link" href="{{ referencing_cases_search_url }}">
+                        {% blocktrans with cases_count=referencing_cases_count %}Show all {{ cases_count }} cases ...{% endblocktrans %}
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    {% else %}
+        <p class="text-center">{% trans 'No other cases cite this decision yet.' %}</p>
+    {% endif %}
+</section>
+
+{% include 'references.html' %}
+
+{% endblock %}

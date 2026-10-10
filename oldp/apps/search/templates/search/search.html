@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load search %}
+{% load html_filters %}
+
+{% block search_form %}
+    {% with sidebar=1 sidebar_toggle_icon='fa-filter' search_form_class=' d-md-none' %}
+        {% include 'includes/search_form.html' %}
+    {% endwith %}
+{% endblock %}
+
+{% block sidebar %}
+    <nav class="collapse nav-sidebar" id="sidebar">
+        {% include 'search/facets.html' %}
+    </nav>
+
+{% endblock %}
+
+{% block content %}
+    <section class="search">
+
+        <form class="form-horizontal search-form d-none d-md-block" action="" role="search" method="get">
+
+            <div class="input-group input-group-lg">
+                <input class="form-control input-large" name="q" placeholder="{% trans 'search_query_placeholder' %}"
+                       type="search" value="{{ query }}">
+
+                <div class="input-group-append">
+                    <button class="btn btn-primary">
+                        <i class="fa fa-search" aria-hidden="true"></i> <span class="hidden-xs">{% trans 'Search' %}</span>
+                    </button>
+                </div>
+            </div>
+
+        </form>
+
+        <details class="search-tips mt-2" style="color: grey; font-size: 0.9rem; padding-left: 15px;">
+            <summary style="cursor: pointer;">{% trans 'Search tips' %}</summary>
+            <ul class="mt-2" style="padding-left: 1.2rem;">
+                <li>{% blocktrans %}<b>Exact phrase</b>: put it in quotes — <code>"Treu und Glauben"</code>.{% endblocktrans %}</li>
+                <li>{% blocktrans %}<b>Exclude a word</b>: prefix it with a minus — <code>Kündigung -Strafrecht</code>.{% endblocktrans %}</li>
+                {# Boolean OR is no longer a query operator (AutoQuery lowercases it to a literal term), so the "use uppercase OR" tip was removed. #}
+                <li>{% blocktrans %}German word forms, umlauts and ß are matched automatically — you don't need the exact spelling.{% endblocktrans %}</li>
+            </ul>
+        </details>
+
+        {% comment %}
+        Active citation-graph filter (set by /law/<sec>/ or /case/<slug>/
+        "View all citing cases" link). Rendered as a dismissible chip
+        that wraps cleanly on narrow viewports — primary theme colour;
+        text wraps inside the badge so long law titles or case file
+        numbers can't overflow the viewport on mobile.
+        {% endcomment %}
+        {% if citation_filter %}
+            <div class="active-filters my-3 px-3">
+                <div class="badge badge-primary d-inline-flex flex-wrap align-items-center text-left text-wrap p-2 mw-100" style="font-size: 0.95rem; gap: .35rem; white-space: normal;">
+                    <span>
+                        {% if citation_filter.kind == 'law' %}
+                            {% trans 'Cases citing' %}
+                        {% else %}
+                            {% trans 'Cases citing case' %}
+                        {% endif %}
+                    </span>
+                    {% if citation_filter.label %}
+                        <strong>{{ citation_filter.label }}</strong>
+                    {% else %}
+                        <em>{% trans '(unknown)' %}</em>
+                    {% endif %}
+                    <a href="{{ clear_citation_url }}"
+                       class="badge-clear ml-2 text-white"
+                       aria-label="{% trans 'Remove filter' %}"
+                       style="font-weight: bold; text-decoration: none;">&times;</a>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="search-container">
+            <div class="search-results">
+
+                {% if search_error %}
+                    <div class="alert alert-danger">
+                        <h4>{% trans 'Error' %}</h4>
+                        <p>{{ search_error }}</p>
+                    </div>
+                {% elif object_list and query or object_list and citation_filter %}
+
+                    <div style="text-align: right; color: grey;">
+                        {% if citation_filter %}
+                            {% if order_by == 'date' %}
+                                {% blocktrans with count=page_obj.paginator.count %}{{ count }} citing cases, sorted by <b>date</b>.{% endblocktrans %}
+                            {% else %}
+                                {% blocktrans with count=page_obj.paginator.count %}{{ count }} citing cases, sorted by <b>relevance</b>.{% endblocktrans %}
+                            {% endif %}
+                        {% elif order_by == 'date' %}
+                            {% blocktrans with count=page_obj.paginator.count %}{{ count }} documents sorted by <b>date</b>.{% endblocktrans %}
+                        {% elif order_by == 'most_cited' %}
+                            {% blocktrans with count=page_obj.paginator.count %}{{ count }} documents sorted by <b>most cited</b>.{% endblocktrans %}
+                        {% else %}
+                            {% blocktrans with count=page_obj.paginator.count %}{{ count }} documents sorted by <b>relevance</b>.{% endblocktrans %}
+                        {% endif %}
+                    </div>
+
+
+                    <ul class="search-items">
+                        {% for result in object_list %}
+                            <li>
+                                <a href="{{ result.absolute_url }}">
+                                    <h4><strong>{{ result.title }}</strong>{% if result.model_type %} ({% trans result.model_type %}){% endif %}</h4>
+
+                                    <p class="search-snippet">
+                                        {{ result|get_search_snippet:query|sanitize_html }}
+                                    </p>
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    {% include 'search/empty_results.html' %}
+                {% endif %}
+
+            </div>
+            <br style="clear: both">
+        </div>
+
+    </section>
+
+    {% if object_list and query or object_list and citation_filter %}
+        {% include 'pagination_list_view.html' %}
+    {% endif %}
+
+{% endblock %}

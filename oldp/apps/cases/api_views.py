@@ -1,0 +1,373 @@
+import logging
+
+from django.conf import settings
+from django.utils.decorators import method_decorator
+from django.views.decorators.vary import vary_on_headers
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.filters import OrderingFilter
+from rest_framework.mixins import ListModelMixin
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+
+from oldp.api import SmallResultsSetPagination
+from oldp.api.cache import cache_page_for_anonymous
+from oldp.api.mixins import ReviewStatusFilterMixin
+from oldp.apps.accounts.permissions import HasTokenPermission
+from oldp.apps.cases.filters import CaseAPIFilter
+from oldp.apps.cases.models import Case
+from oldp.apps.cases.search_indexes import CaseIndex
+from oldp.apps.cases.serializers import (
+    CASE_API_FIELDS,
+    CASE_API_LIST_FIELDS,
+    CaseCreateResponseSerializer,
+    CaseCreateSerializer,
+    CaseListSerializer,
+    CaseSearchSerializer,
+    CaseSerializer,
+    CaseUpdateSerializer,
+)
+from oldp.apps.cases.services import CaseCreator
+from oldp.apps.laws.serializers import LawListSerializer
+from oldp.apps.references.serializers import (
+    ForwardReferencesResponseSerializer,
+)
+from oldp.apps.references.services import (
+    case_forward_references,
+    citing_laws_for_case,
+)
+from oldp.apps.search.api import SearchFilter, SearchViewMixin
+from oldp.apps.search.filters import SearchSchemaFilter
+
+logger = logging.getLogger(__name__)
+
+
+class CaseViewSet(ReviewStatusFilterMixin, viewsets.ModelViewSet):
+    """ViewSet for cases.
+
+    Supports listing, retrieving, creating, updating, and deleting cases.
+
+    **Creating cases:**
+
+    POST /api/cases/?extract_refs=true with JSON body containing:
+    - court_name (required): Court name for automatic resolution
+    - file_number (required): Court file number
+    - date (required): Publication date (YYYY-MM-DD)
+    - content (required): Full case content in HTML
+    - type (optional): Decision type (e.g., 'Urteil', 'Beschluss')
+    - ecli (optional): European Case Law Identifier
+    - abstract (optional): Case summary in HTML
+    - title (optional): Case title
+    - source (optional): Object with name (required) and homepage (optional).
+      Looked up by name; created if not found. Default source used when omitted.
+    Query parameters:
+    - extract_refs (optional): Extract references from content (default: true)
+
+    The court is automatically resolved from the court_name.
+    Returns 409 Conflict if a case with the same court and file_number exists.
+    """
+
+    permission_classes = [HasTokenPermission]
+    token_resource = "cases"
+
+    pagination_class = (
+        SmallResultsSetPagination  # limit page (content field blows up response size)
+    )
+    queryset = Case.objects.all()
+    serializer_class = CaseSerializer
+    # lookup_field = 'slug'
+
+    filter_backends = (
+        OrderingFilter,
+        DjangoFilterBackend,
+    )
+    filterset_class = CaseAPIFilter
+    ordering_fields = ("date",)
+
+    def get_permissions(self):
+        """Return permissions based on action - require auth for write operations."""
+        action = getattr(self, "action", None)
+        if action in ["create", "update", "partial_update", "destroy"]:
+            return [IsAuthenticated(), HasTokenPermission()]
+        return [HasTokenPermission()]
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        action = getattr(self, "action", None)
+        if action == "create":
+            return CaseCreateSerializer
+        if action in ("update", "partial_update"):
+            return CaseUpdateSerializer
+        if action == "list":
+            return CaseListSerializer
+        return CaseSerializer
+
+    def update(self, request, *args, **kwargs):
+        """Update a case (review_status only). Requires staff user."""
+        if not request.user.is_staff:
+            raise PermissionDenied("Only staff users can update case review status.")
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """Partially update a case (review_status only). Requires staff user."""
+        if not request.user.is_staff:
+            raise PermissionDenied("Only staff users can update case review status.")
+        return super().partial_update(request, *args, **kwargs)
+
+    @method_decorator(cache_page_for_anonymous(settings.CACHE_TTL))
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language", "Host"))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # ``select_related("created_by_token")`` was unconditional, but
+        # only ``ReviewStatusFieldMixin`` reads it — and only for
+        # authenticated non-staff requests. For anonymous list traffic
+        # the LEFT OUTER JOIN to ``accounts_apitoken`` adds a cold-cache
+        # PK lookup per row against a rarely-touched table.
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None)
+        needs_token = user is not None and getattr(user, "is_authenticated", False)
+        action = getattr(self, "action", None)
+
+        if action == "list":
+            # Use ``prefetch_related("court")`` rather than
+            # ``select_related("court")`` for the list path. The
+            # single-query JOIN shape made MariaDB pick ``courts_court``
+            # as the leading table and scan ~1k courts then materialise
+            # ~240k rows into a temp table before the filesort, taking
+            # ~2.5s. Splitting the JOIN out lets the planner index-walk
+            # ``cases_case_date_05882e4a`` directly, and the prefetch
+            # batches all unique courts into one follow-up query —
+            # total ~5ms warm.
+            qs = qs.prefetch_related("court")
+            if needs_token:
+                qs = qs.select_related("created_by_token").only(
+                    *CASE_API_LIST_FIELDS,
+                    "created_by_token_id",
+                    "created_by_token__user_id",
+                )
+            else:
+                qs = qs.only(*CASE_API_LIST_FIELDS)
+            return qs
+
+        if action == "references":
+            # ``case_forward_references`` reads only id / file_number /
+            # references_extracted_at off the source case — never ``content``,
+            # and never ``court``. Loading the full body (plus the court JOIN)
+            # to emit a few KB of citation metadata was a large slice of this
+            # endpoint's ~8s p-max in production.
+            ref_fields = (
+                "id",
+                "slug",
+                "file_number",
+                "references_extracted_at",
+                "review_status",
+            )
+            if needs_token:
+                return qs.select_related("created_by_token").only(
+                    *ref_fields,
+                    "created_by_token_id",
+                    "created_by_token__user_id",
+                )
+            return qs.only(*ref_fields)
+
+        # Detail / write path: pk-lookup is fast even with the wide JOIN.
+        qs = qs.select_related("court")
+        if needs_token:
+            qs = qs.select_related("created_by_token").only(
+                *CASE_API_FIELDS,
+                "created_by_token_id",
+                "created_by_token__user_id",
+            )
+        else:
+            qs = qs.only(*CASE_API_FIELDS)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        """Create a new case.
+
+        The court is automatically resolved from the provided court_name.
+        References are extracted from content by default (configurable via extract_refs query param).
+        The API token used for creation is tracked on the case.
+
+        Query parameters:
+            extract_refs: Whether to extract references (default: true)
+
+        Returns:
+            201 Created: {"id": <case_id>, "slug": "<case_slug>"}
+            400 Bad Request: Validation errors or court not found
+            409 Conflict: Case with same court and file_number already exists
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+
+        # Get extract_refs from query parameter (default: true)
+        extract_refs_param = request.query_params.get("extract_refs", "true")
+        extract_refs = extract_refs_param.lower() not in ("false", "0", "no")
+
+        # Get the API token from the request (set by authentication)
+        api_token = getattr(request, "auth", None)
+
+        # Create the case using the service
+        creator = CaseCreator(extract_refs=extract_refs)
+
+        # Extract optional source info
+        source_data = data.get("source")
+        source_name = source_data["name"] if source_data else None
+        source_homepage = source_data.get("homepage", "") if source_data else None
+
+        case = creator.create_case(
+            court_name=data["court_name"],
+            file_number=data["file_number"],
+            date=data["date"],
+            content=data["content"],
+            case_type=data.get("type"),
+            ecli=data.get("ecli"),
+            abstract=data.get("abstract"),
+            title=data.get("title"),
+            source_url=data.get("source_url", ""),
+            api_token=api_token,
+            extract_refs=extract_refs,
+            source_name=source_name,
+            source_homepage=source_homepage,
+        )
+
+        # Return minimal response with id, slug, and review_status
+        response_serializer = CaseCreateResponseSerializer(
+            {"id": case.id, "slug": case.slug, "review_status": case.review_status}
+        )
+
+        logger.info(
+            "Case created via API: id=%s, slug=%s, token=%s",
+            case.id,
+            case.slug,
+            api_token.name if api_token else "None",
+        )
+
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    # --- Citation graph -------------------------------------------------
+    #
+    # Three nested read-only actions exposing the cite-graph navigation
+    # also available via the MCP tools. Implementation lives in
+    # ``oldp/apps/references/services``; this layer just resolves the
+    # detail object, calls the service, and paginates.
+
+    @swagger_auto_schema(responses={200: ForwardReferencesResponseSerializer})
+    @action(detail=True, methods=["get"], permission_classes=[AllowAny])
+    def references(self, request, pk=None):
+        """Forward references emitted by this case (laws + cases it cites)."""
+        case = self.get_object()
+        return Response(case_forward_references(case))
+
+    @swagger_auto_schema(responses={200: CaseListSerializer(many=True)})
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[AllowAny],
+        serializer_class=CaseListSerializer,
+    )
+    def citing_cases(self, request, pk=None):
+        """Cases whose body cites this case.
+
+        Backed by Elasticsearch (``CaseIndex.cited_cases``). On ES
+        failure raises ``SearchBackendTimeout`` /
+        ``SearchBackendUnavailable`` → 503 + structured body.
+        """
+        from oldp.apps.search.exceptions import (
+            SearchBackendTimeout,
+            SearchBackendUnavailable,
+        )
+        from oldp.apps.search.utils import (
+            citing_cases_queryset_via_es,
+            is_search_backend_error,
+            is_search_backend_timeout,
+        )
+
+        case = self.get_object()
+        try:
+            qs, _total = citing_cases_queryset_via_es("cited_cases", str(case.pk))
+        except Exception as exc:
+            if is_search_backend_timeout(exc):
+                raise SearchBackendTimeout() from exc
+            if is_search_backend_error(exc):
+                raise SearchBackendUnavailable() from exc
+            raise
+        page = self.paginate_queryset(qs)
+        serializer = CaseListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(responses={200: LawListSerializer(many=True)})
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[AllowAny],
+        serializer_class=LawListSerializer,
+    )
+    def citing_laws(self, request, pk=None):
+        """Laws whose body cites this case (rare in practice; included for symmetry).
+
+        Returns paginated summary records (``LawListSerializer``) —
+        ``content`` is omitted; fetch ``/api/laws/<id>/`` if the full
+        body of a citing law is needed. Mirrors
+        ``LawViewSet.citing_laws``: the underlying queryset defers
+        ``content`` (``Law.defer_fields_list_view``), so serialising it
+        with the full ``LawSerializer`` would both re-fetch the deferred
+        multi-MB HTML per row and inflate the response payload.
+        """
+        case = self.get_object()
+        qs = citing_laws_for_case(case)
+        page = self.paginate_queryset(qs)
+        serializer = LawListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+
+class CaseSearchSchemaFilter(SearchSchemaFilter):
+    search_index_class = CaseIndex
+
+    def get_default_schema_operation_parameters(self):
+        return [
+            {
+                "name": "text",
+                "required": True,
+                "in": "query",
+                "description": "Search query on text content (Lucene syntax support).",
+                "schema": {"type": "string"},
+            }
+        ]
+
+
+class CaseSearchViewSet(SearchViewMixin, viewsets.GenericViewSet, ListModelMixin):
+    """Full-text search for cases via Elasticsearch.
+
+    Requires the `text` query parameter. Returns highlighted snippets by default;
+    use `return_text=1` to include the full text. Supports date range filtering
+    with `start_date` and `end_date`, and facet filtering (e.g. `court`, `decision_type`).
+    """
+
+    permission_classes = (AllowAny,)
+    pagination_class = (
+        SmallResultsSetPagination  # limit page (content field blows up response size)
+    )
+    search_models = [Case]
+    serializer_class = CaseSearchSerializer
+    filter_backends = (
+        SearchFilter,
+        CaseSearchSchemaFilter,
+    )
+
+    @method_decorator(cache_page_for_anonymous(settings.CACHE_TTL))
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language", "Host"))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)

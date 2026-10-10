@@ -1,0 +1,167 @@
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib import admin
+from django.contrib.flatpages import views as flatpages_views
+from django.contrib.sitemaps import views as sitemaps_views
+from django.urls import include, path, re_path
+from django.views.decorators.cache import cache_page
+from django.views.generic import RedirectView, TemplateView
+
+from oldp.apps import cases
+from oldp.apps.cases.admin_views import CaseCreationDashboardView
+from oldp.apps.cases.sitemaps import CaseSitemap
+from oldp.apps.courts.admin_views import CourtCreationDashboardView
+from oldp.apps.courts.sitemaps import CourtSitemap
+from oldp.apps.laws.admin_views import (
+    LawBookCreationDashboardView,
+    LawCreationDashboardView,
+)
+from oldp.apps.laws.sitemaps import LawSitemap
+from oldp.apps.pages.views import page_view
+from oldp.apps.search.views import CustomSearchView, autocomplete_view
+from oldp.utils.cache_per_user import cache_per_role
+from django.http import HttpResponse
+from oldp.apps.homepage import views_poc
+
+# Error handlers
+handler500 = "oldp.apps.homepage.views.error500_view"
+handler404 = "oldp.apps.homepage.views.error404_view"
+handler403 = "oldp.apps.homepage.views.error_permission_denied_view"
+handler400 = "oldp.apps.homepage.views.error_bad_request_view"
+
+
+urlpatterns = [
+    # Admin custom views (must be before admin.site.urls)
+    path(
+        "admin/cases/dashboard/",
+        CaseCreationDashboardView.as_view(),
+        name="cases_creation_dashboard",
+    ),
+    path(
+        "admin/laws/dashboard/",
+        LawCreationDashboardView.as_view(),
+        name="laws_creation_dashboard",
+    ),
+    path(
+        "admin/lawbooks/dashboard/",
+        LawBookCreationDashboardView.as_view(),
+        name="lawbooks_creation_dashboard",
+    ),
+    path(
+        "admin/courts/dashboard/",
+        CourtCreationDashboardView.as_view(),
+        name="courts_creation_dashboard",
+    ),
+    # Admin
+    re_path(r"^admin/", admin.site.urls),
+    # Apps
+    re_path(r"^case/", include("oldp.apps.cases.urls")),
+    re_path(r"^c/(?P<pk>[0-9]+)$", cases.views.short_url_view, name="cases_short_url"),
+    re_path(r"^law/", include("oldp.apps.laws.urls")),
+    re_path(r"^court/", include("oldp.apps.courts.urls")),
+    re_path(r"^accounts/", include("oldp.apps.accounts.urls")),
+    re_path(r"^accounts/", include("allauth.urls")),
+    re_path(r"^contact/", include("oldp.apps.contact.urls")),
+    re_path(r"^search/autocomplete", autocomplete_view),
+    re_path(
+        r"^search/",
+        cache_per_role(settings.CACHE_TTL)(CustomSearchView.as_view()),
+        name="haystack_search",
+    ),
+    re_path(r"^sources/", include("oldp.apps.sources.urls")),
+    # Files
+    re_path(
+        r"^favicon\.ico$",
+        RedirectView.as_view(url="/static/favicon.ico", permanent=True),
+    ),
+    re_path(
+        r"^robots\.txt$",
+        TemplateView.as_view(template_name="robots.txt", content_type="text/plain"),
+    ),
+    # Third-party apps
+    # re_path(r'^tellme/', include("tellme.urls")),
+    # API
+    re_path(r"^api/", include("oldp.api.urls")),
+    # MCP + OAuth endpoints (must be after API to avoid circular imports)
+    path("", include("oldp.apps.mcp.urls")),
+    # Homepage
+    re_path(r"^", include("oldp.apps.homepage.urls")),
+    # Health check
+    re_path(r"^health$", lambda request: HttpResponse("OK", content_type="text/plain")),
+    # Static markdown pages (oldp.apps.pages). Single-segment /pages/<slug>/ is
+    # served from a markdown file; on miss the view falls back to a DB flatpage,
+    # and multi-segment /pages/a/b/ falls through to the flatpages catch-all.
+    re_path(r"^pages/(?P<slug>[\w-]+)/$", page_view, name="markdown_page"),
+    re_path(r"^pages(?P<url>.*/)$", flatpages_views.flatpage, name="flatpages"),
+    path("poc-search/", views_poc.poc_search_view, name="poc_search"),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# 301 legacy bare flatpage URLs (historically served at /<slug>/ by the flatpage
+# fallback middleware) to the new /pages/<slug>/ markdown routes. These match
+# before the 404/fallback, so they take precedence over any leftover flatpage.
+urlpatterns += [
+    re_path(
+        rf"^{_slug}/$",
+        RedirectView.as_view(url=f"/pages/{_slug}/", permanent=True),
+        name=f"legacy_flatpage_{_slug}",
+    )
+    for _slug in ("imprint", "privacy", "terms")
+]
+
+# Sitemaps
+sitemaps = {
+    "court": CourtSitemap(),
+    "case": CaseSitemap(),
+    "law": LawSitemap(),
+}
+
+urlpatterns += [
+    path(
+        "sitemap.xml", cache_page(86400)(sitemaps_views.index), {"sitemaps": sitemaps}
+    ),
+    path(
+        "sitemap-<section>.xml",
+        cache_page(86400)(sitemaps_views.sitemap),
+        {"sitemaps": sitemaps},
+        name="django.contrib.sitemaps.views.sitemap",
+    ),
+]
+
+
+# DEBUG only views
+if settings.DEBUG and "debug_toolbar" in settings.INSTALLED_APPS:
+    # Django debug toolbar
+    import debug_toolbar
+
+    urlpatterns = [
+        re_path(r"^__debug__/", include(debug_toolbar.urls)),
+    ] + urlpatterns
+
+# Django Silk profiling (toggled via PROFILING_ENABLED env var)
+if "silk" in settings.INSTALLED_APPS:
+    urlpatterns = [
+        path("silk/", include("silk.urls", namespace="silk")),
+    ] + urlpatterns
+
+# """
+# URL configuration for oldp project.
+
+# The `urlpatterns` list routes URLs to views. For more information please see:
+#     https://docs.djangoproject.com/en/5.0/topics/http/urls/
+# Examples:
+# Function views
+#     1. Add an import:  from my_app import views
+#     2. Add a URL to urlpatterns:  path('', views.home, name='home')
+# Class-based views
+#     1. Add an import:  from other_app.views import Home
+#     2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+# Including another URLconf
+#     1. Import the include() function: from django.urls import include, path
+#     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+# """
+# from django.contrib import admin
+# from django.urls import path
+
+# urlpatterns = [
+#     path('admin/', admin.site.urls),
+# ]

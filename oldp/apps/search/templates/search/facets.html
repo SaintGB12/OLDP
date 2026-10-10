@@ -1,0 +1,169 @@
+{% load i18n %}
+{% load string_filters %}
+{% load search %}
+
+<div class="search-facets">
+
+
+    <form action="" method="get">
+        <input type="hidden" name="q" value="{{ query }}">
+        <input type="hidden" name="start_date" value="" class="rangeFromDate">
+        <input type="hidden" name="end_date" value="" class="rangeToDate">
+        {% if citation_filter %}
+            {% for key, value in citation_filter.params.items %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+        {% endif %}
+        {% for facet in selected_facets %}
+            <input type="hidden" name="selected_facets" value="{{ facet }}">
+        {% endfor %}
+
+        {% if not search_facets  %}
+            <p>{% trans 'No filter available.' %}</p>
+        {% endif %}
+
+        <div class="search-facet">
+            <strong>{% trans 'Sort by' %}</strong>
+            <ul>
+                <li class="search-facet-choice">
+                    <label class="d-block">
+                        <input type="radio" name="order_by" value=""
+                               onchange="this.form.submit()"
+                               {% if not order_by %}checked{% endif %}>
+                        <span>{% trans 'Relevance' %}</span>
+                    </label>
+                </li>
+                <li class="search-facet-choice">
+                    <label class="d-block">
+                        <input type="radio" name="order_by" value="date"
+                               onchange="this.form.submit()"
+                               {% if order_by == 'date' %}checked{% endif %}>
+                        <span>{% trans 'Date (newest first)' %}</span>
+                    </label>
+                </li>
+                <li class="search-facet-choice">
+                    <label class="d-block">
+                        <input type="radio" name="order_by" value="most_cited"
+                               onchange="this.form.submit()"
+                               {% if order_by == 'most_cited' %}checked{% endif %}>
+                        <span>{% trans 'Most cited first' %}</span>
+                    </label>
+                </li>
+            </ul>
+        </div>
+
+        {% if search_facets.facet_model_name %}
+            {% with facet=search_facets.facet_model_name %}
+                <div class="search-facet">
+                    <strong>{% trans 'Document type' %}</strong>
+                    <ul>
+                        {% for choice in facet.choices %}
+                            {% include 'search/facet_choice.html' %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endwith %}
+        {% endif %}
+
+        {% if search_facets.book_code %}
+            {% with facet=search_facets.book_code %}
+                <div class="search-facet">
+                    <strong>{% trans 'Law book' %}</strong>
+                    <ul>
+                        {% for choice in facet.choices %}
+                            {% include 'search/facet_choice.html' %}
+                        {% endfor %}
+                        {% if facet.choices|length > 5 %}
+                            <li>
+                                <button type="button" onclick="showMoreFacets(this);" class="btn btn-link btn-sm" data-facet-name="{{ facet.name }}">
+                                    <i class="fa fa-arrow-down"></i> See more
+                                </button>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            {% endwith %}
+        {% endif %}
+
+        {% if search_facets.decision_type %}
+            {% with facet=search_facets.decision_type %}
+                <div class="search-facet">
+                    <strong>{% trans 'Decision type' %}</strong>
+                    <ul>
+                        {% for choice in facet.choices %}
+                            {% include 'search/facet_choice.html' %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endwith %}
+        {% endif %}
+
+        {% if search_facets.court %}
+            {% with facet=search_facets.court %}
+                <div class="search-facet">
+                    <strong>{% trans 'Court' %}</strong>
+                    <ul>
+                        {% for choice in facet.choices %}
+                            {% include 'search/facet_choice.html' %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endwith %}
+        {% endif %}
+
+        {% if search_facets.court_jurisdiction %}
+            {% with facet=search_facets.court_jurisdiction %}
+                <div class="search-facet">
+                    <strong>{% trans 'Jurisdiction' %}</strong>
+                    <ul>
+                        {% for choice in facet.choices %}
+                            {% include 'search/facet_choice.html' %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endwith %}
+        {% endif %}
+
+        {% if search_facets.court_level_of_appeal %}
+            {% with facet=search_facets.court_level_of_appeal %}
+                <div class="search-facet">
+                    <strong>{% trans 'Level of Appeal' %}</strong>
+                    <ul>
+                        {% for choice in facet.choices %}
+                            {% include 'search/facet_choice.html' %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endwith %}
+        {% endif %}
+
+
+        {% with facet_dates=facets.dates.date|filter_zero_count_facets %}
+        {% if facet_dates %}
+
+        <div class="search-facet">
+        <strong>{% trans 'Publication date' %}:</strong>
+        <ul>
+        {% for facet_date, count in facet_dates %}
+            <li class="search-facet-choice {% if forloop.counter > 5 %} search-facet-choice-more {% endif %}" data-facet-name="date">
+                <a href="?q={{ query|urlencode }}&start_date={{ facet_date|date:'Y' }}-01-01&end_date={{ facet_date|date:'Y' }}-12-31{% if order_by %}&order_by={{ order_by|urlencode }}{% endif %}{% if citation_filter %}{% for key, value in citation_filter.params.items %}&{{ key }}={{ value|urlencode }}{% endfor %}{% endif %}{% for facet in selected_facets %}&selected_facets={{ facet|urlencode }}{% endfor %}">
+                    <input type="checkbox"{% if choice.selected %} checked{% endif %} style="pointer-events: none;"> <span>{{ facet_date|date:"Y" }}</span></a> ({{ count }})
+            </li>
+        {% endfor %}
+
+        {% if facet_dates|length > 5 %}
+        <li>
+            <button type="button" onclick="showMoreFacets(this);" class="btn btn-link btn-sm" data-facet-name="{{ facet.name }}">
+                <i class="fa fa-arrow-down"></i> See more
+            </button>
+        </li>
+        {% endif %}
+
+        </ul>
+        </div>
+        {% endif %}
+
+        {% endwith %}
+
+    </form>
+</div>

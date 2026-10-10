@@ -1,0 +1,187 @@
+[project]
+name = "oldp"
+version = "0.14.4"
+description = "Open Legal Data Platform"
+readme = "README.md"
+authors = [
+    { name = "Malte Ostendorff", email = "hello@openlegaldata.io" },
+]
+license = "MIT"
+keywords = ["open data", "law", "legal tech", "case law"]
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Framework :: Django',
+    'Intended Audience :: Developers',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Topic :: Utilities',
+]
+requires-python = ">=3.11"
+dependencies = [
+# Base requirements
+"Pillow>=7.1.0",
+"python-dateutil>=2.6.1",
+"python-slugify>=1.2.1",
+"requests>=2.20.1",
+"requests-toolbelt>=0.7.1",
+"whitenoise>=4.1.3",
+"beautifulsoup4>=4.7.1",
+# Render static legal/info pages from markdown (oldp.apps.pages). Capped below
+# 4.0: Markdown majors have changed extension/output behaviour before.
+"Markdown>=3.4,<4",
+# HTML sanitizer for ingested case/law content (oldp.apps.lib.html_sanitizer).
+# Pinned to the 0.3.x line: nh3 is pre-1.0, so bound it to avoid breaking changes.
+"nh3>=0.3.0,<0.4",
+"msgpack>=0.3.0,<0.6",  # See spacy issue: https://github.com/explosion/spaCy/issues/2995
+
+# Django
+"django==5.2.16",  # stable version as of Jan 2025 + security patch
+"dj-database-url", #>=0.5.0
+"django-appconf", #>=1.0.2
+"django-configurations", #>=2.1
+"django-environ", #>=0.4.4
+"django-mathfilters", #>=0.4.0
+"django-compressor", #>=2.2
+"django-tellme", #>=0.6.5
+"django-widget-tweaks", #>=1.4.1
+"django-autocomplete-light", #>=3.3.2
+"django-haystack", #>=3.0b2
+"django-crispy-forms", #>=1.7.2
+"crispy-bootstrap4>=2024.10",
+
+# User registration with social auth https://github.com/pennersr/django-allauth
+# django-allauth==0.37.1
+"django-allauth>=65.1.0",
+
+# https://github.com/jazzband/django-debug-toolbar
+"django-debug-toolbar", #>=2.2.1
+
+# API
+# -------------------------
+"djangorestframework", #>=3.10.3
+"django-filter", #>=2.1.0
+"djangorestframework-xml", #>=1.4.0
+# djangorestframework==3.10.3
+# django-filter==2.1.0
+# drf-haystack>=1.8.6
+# djangorestframework-xml==1.4.0
+# Swagger https://github.com/axnsan12/drf-yasg
+"drf-yasg", #==1.17.1
+"drf-yasg[validation]", #==1.17.1
+"flex", #==6.14.0
+"swagger-spec-validator", #==2.4.3
+
+# Used for UML chart https://github.com/django-extensions/django-extensions
+# django-extensions==2.1.9
+# django-extensions #>=2.1.9
+
+# https://github.com/openlegaldata/legal-reference-extraction
+"legal-reference-extraction==0.5.5",
+
+# MCP (Model Context Protocol) server
+# https://github.com/gts360/django-mcp-server
+"django-mcp-server>=0.5.7",
+# Cap the MCP SDK to the 1.27.x line. Two independent breakages otherwise:
+# mcp 2.0 moved ``FastMCP`` out of ``mcp.server`` (django-mcp-server does
+# ``from mcp.server import FastMCP``) -> import error; and mcp 1.28+ changed the
+# OAuth Dynamic Client Registration surface so the DCR endpoint 404s (see
+# oldp.apps.mcp.tests.test_oauth_views). 1.27.x is the version dev runs and
+# tests pass on; revisit when adopting a newer MCP SDK.
+"mcp>=1.8.0,<1.28",
+
+# OAuth2 for MCP connector authentication
+# https://django-oauth-toolkit.readthedocs.io/
+# Cap below 3.3: 3.3+ added its own RFC 7591 ``register/`` route inside
+# ``oauth2_provider.urls``, which shadows oldp's ``oauth/register/`` DCR view
+# (included first in oldp/apps/mcp/urls.py) and 404s the DCR tests. 3.2.x is
+# what dev runs; when adopting 3.3+, drop oldp's own DCR view and reorder/rename
+# the route to use the library's endpoint.
+"django-oauth-toolkit>=3.0.1,<3.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  # Pin below 0.15: ruff 0.15+ reformats Python code blocks inside Markdown,
+  # which flags 7 pre-existing docs and breaks `make lint-check` on an unpinned
+  # (latest) install. Bump deliberately + reformat docs.
+  "ruff>=0.11.6,<0.15",
+  "selenium==3.141.0",
+  "coverage>=4.5.1",
+  "coveralls>=1.5.0",
+]
+theme-de = [
+  # https://github.com/openlegaldata/oldp-de
+  # Pinned: stage/prod images bake in this exact version. Bump in lock-step
+  # with a published oldp-de release (PyPI) when picking up theme changes.
+  "oldp-de==0.1.6"
+]
+prod = [
+  "gunicorn>=19.9.0",
+]
+processing = [
+  "pypandoc>=1.15",
+  "cssselect>=1.3.0",
+  "lxml>=5.3.2",
+]
+mysql = [
+  # on mac: brew install mysql pkg-config
+  "mysqlclient>=2.2.5",
+]
+redis = [
+  # cache
+  "django-redis",
+]
+search = [
+  # haystack supports only es <= 7
+  "elasticsearch==7.17.12",
+  "elasticsearch-dsl==7.4.1",
+]
+docs = [
+  "sphinx>=7.0",
+  "sphinx-rtd-theme>=2.0",
+  "sphinx-polyversion>=2.0.0",
+  "myst-parser>=2.0",
+]
+profiling = [
+  "django-silk>=5.3.0",
+  "django-querycount>=0.8.0",
+]
+all = [
+  "oldp[dev,theme-de,prod,processing,mysql,search,docs,profiling,redis]"
+]
+
+[project.urls]
+homepage = "https://openlegaldata.io"
+"Source Code" = "https://github.com/openlegaldata/oldp"
+
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = ["oldp*"]  # package names should match these glob patterns (["*"] by default)
+exclude = []  # exclude packages matching these glob patterns (empty by default)
+namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["F", "I", "E", "D"]
+ignore = ["E501",   # line too long 
+        "E741",     # ambiguous variable name
+        "D100",     # Missing docstring in public module
+        "D101",     # Missing docstring in public class
+        "D102",     # Missing docstring in public method
+        "D103",     # Missing docstring in public function
+        "D105",     # Missing docstring in magic method
+        "D104",     # Missing docstring in public package
+        "D107",     # Missing docstring in __init__
+        "D205",     # 1 blank line required between summary line and description
+        "D415",     # First line should end with a period
+        "D106",     # undocumented-public-nested-class
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-annotations]
+mypy-init-return = true
+suppress-none-returning = true

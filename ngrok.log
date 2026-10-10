@@ -1,0 +1,18 @@
+t=2026-10-03T16:21:21+0200 lvl=info msg="no configuration paths supplied"
+t=2026-10-03T16:21:21+0200 lvl=info msg="using configuration at default config path" path="/Users/medzou/Library/Application Support/ngrok/ngrok.yml"
+t=2026-10-03T16:21:21+0200 lvl=info msg="open config file" path="/Users/medzou/Library/Application Support/ngrok/ngrok.yml" err=<nil>
+t=2026-10-03T16:21:21+0200 lvl=info msg="FIPS 140 mode" enabled=false
+t=2026-10-03T16:21:21+0200 lvl=info msg="starting web service" obj=web addr=127.0.0.1:4040 allow_hosts=[]
+t=2026-10-03T16:21:22+0200 lvl=info msg="client session established" obj=tunnels.session
+t=2026-10-03T16:21:22+0200 lvl=info msg="tunnel session started" obj=tunnels.session
+t=2026-10-03T16:21:22+0200 lvl=info msg="started tunnel" obj=tunnels name=command_line addr=http://localhost:8000 url=https://spoof-upright-backyard.ngrok-free.dev
+t=2026-10-03T16:21:31+0200 lvl=info msg=start pg=/api/tunnels id=448e45f5d1f58ec3
+t=2026-10-03T16:21:31+0200 lvl=info msg=end pg=/api/tunnels id=448e45f5d1f58ec3 status=200 dur=116.75µs
+t=2026-10-03T16:22:39+0200 lvl=info msg="join connections" obj=join id=5d3460e2e0ce l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:52254
+t=2026-10-03T16:24:12+0200 lvl=info msg="join connections" obj=join id=0174aff0e5dc l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:57863
+t=2026-10-03T16:24:13+0200 lvl=info msg="join connections" obj=join id=fca6a5e8d573 l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:57863
+t=2026-10-03T16:24:13+0200 lvl=info msg="join connections" obj=join id=062bf3068ec8 l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:57863
+t=2026-10-03T16:29:22+0200 lvl=info msg="join connections" obj=join id=2294e21f6bf9 l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:57867
+t=2026-10-03T16:29:49+0200 lvl=info msg="join connections" obj=join id=2d2cee9d818d l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:52283
+t=2026-10-03T17:28:25+0200 lvl=info msg="join connections" obj=join id=28814118dbe3 l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:58002
+t=2026-10-03T17:30:02+0200 lvl=info msg="join connections" obj=join id=c8a837abeb5b l=[::1]:8000 r=[2a01:cb06:c01c:d8e9:5d00:ac2d:e7d5:831]:58002

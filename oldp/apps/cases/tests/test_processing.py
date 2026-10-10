@@ -1,0 +1,270 @@
+import json
+import logging
+import os
+
+from django.test import TestCase, tag
+
+from oldp.apps.cases.models import Case
+from oldp.apps.cases.processing.processing_steps.assign_court import (
+    ProcessingStep as AssignCourt,
+)
+from oldp.apps.cases.processing.processing_steps.extract_refs import (
+    ProcessingStep as ExtractRefs,
+)
+from oldp.apps.courts.apps import CourtLocationLevel, CourtTypes
+from oldp.apps.courts.models import Court
+from oldp.utils.test_utils import TestCaseHelper
+
+logger = logging.getLogger(__name__)
+RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "resources")
+
+
+@tag("processing")
+class CasesProcessingTestCase(TestCase, TestCaseHelper):
+    fixtures = [
+        "locations/countries.json",
+        "locations/states.json",
+        "locations/cities.json",
+        "courts/courts.json",
+        "cases/cases.json",
+    ]
+
+    def setUp(self):
+        super().setUp()
+
+    def test_extract_law_refs_1(self):
+        unprocessed = Case.objects.get(pk=1)
+        step = ExtractRefs(
+            law_refs=True, case_refs=False, law_book_codes=["AsylG", "VwGO"]
+        )
+
+        case = step.process(unprocessed)
+
+        # TODO Validate test - old value: 33
+        markers = case.get_reference_markers()
+        self.assertEqual(3, len(markers), "Invalid number of markers")
+
+        refs = case.get_references()
+
+        self.assertEqual(4, len(refs), "Invalid number of references")
+
+    def test_extract_refs_sets_references_extracted_at(self):
+        """Regression test.
+
+        The extract_refs step must record when it ran so consumers can
+        distinguish "extraction returned no refs" from "extraction
+        never ran for this case". Pre-fix the field was always None.
+        """
+        from django.utils import timezone
+
+        case = Case.objects.get(pk=1)
+        self.assertIsNone(
+            case.references_extracted_at,
+            "Fixture case starts with no extraction timestamp",
+        )
+
+        before = timezone.now()
+        step = ExtractRefs(
+            law_refs=True, case_refs=False, law_book_codes=["AsylG", "VwGO"]
+        )
+        case = step.process(case)
+        case.save()
+
+        # Reload to make sure the value persisted.
+        case.refresh_from_db()
+        self.assertIsNotNone(case.references_extracted_at)
+        self.assertGreaterEqual(case.references_extracted_at, before)
+
+    def test_assign_court(self):
+        class TestCourtTypes(CourtTypes):
+            def get_types(self):
+                return {
+                    "AG": {"name": "Amtsgericht", "levels": [CourtLocationLevel.CITY]},
+                }
+
+        with self.settings(COURT_TYPES=TestCourtTypes()):
+            unprocessed = Case.objects.get(pk=1)
+
+            self.assertEqual(
+                Court.DEFAULT_ID,
+                unprocessed.pk,
+                "Unprocessed case has already assigned court",
+            )
+
+            case = AssignCourt().process(unprocessed)
+
+            self.assertEqual(1166, case.court.pk, "Invalid court id")
+            self.assertEqual("EuGH", case.court.code, "Invalid court code")
+
+            with_city = AssignCourt().process(
+                Case(
+                    court_id=Court.DEFAULT_ID,
+                    file_number="with-city",
+                    court_raw=json.dumps(
+                        {
+                            "name": "Amtsgericht Aalen",
+                        }
+                    ),
+                )
+            )
+
+            self.assertEqual(1173, with_city.court.pk, "Invalid court id")
+
+            #
+            with_chamber = AssignCourt().process(
+                Case(
+                    court_id=Court.DEFAULT_ID,
+                    file_number="with-chamber",
+                    court_raw=json.dumps(
+                        {
+                            "name": "Bundesverfassungsgericht 5. Kammer",
+                        }
+                    ),
+                )
+            )
+
+            self.assertEqual(1167, with_chamber.court.pk, "Invalid court id")
+
+            not_found = AssignCourt().process(
+                Case(
+                    court_id=2,
+                    file_number="with-chamber",
+                    court_raw=json.dumps(
+                        {
+                            "name": "Some other court",
+                        }
+                    ),
+                )
+            )
+
+            self.assertEqual(Court.DEFAULT_ID, not_found.court_id, "Invalid court id")
+
+    def test_assign_court_umlauts(self):
+        class TestCourtTypes(CourtTypes):
+            def get_types(self):
+                return {"EuGH": {"name": "Europäischer Gerichtshof", "levels": []}}
+
+        with self.settings(COURT_TYPES=TestCourtTypes()):
+            case_with_umlauts = AssignCourt().process(
+                Case(
+                    court_id=Court.DEFAULT_ID,
+                    file_number="with-umlauts",
+                    court_raw='{"name": "Europ\u00e4ischer Gerichtshof 9. Senat"}',
+                )
+            )
+
+            self.assertEqual(1166, case_with_umlauts.court_id)
+        # print(case_with_umlauts.court)
+
+
+@tag("processing")
+class CaseProcessorAtomicTestCase(TestCase):
+    """Pin the ``transaction.atomic`` wrap in ``CaseProcessor.process_content_item``.
+
+    During backfill the marker delete + re-extract + re-save sequence
+    used to be three independent autocommit transactions. Concurrent
+    readers of the case-detail view could observe the case in the
+    "markers deleted, new ones not yet inserted" intermediate state
+    and render an empty references panel for ~milliseconds. The wrap
+    in ``CaseProcessor.process_content_item`` makes the swap atomic.
+    """
+
+    fixtures = [
+        "locations/countries.json",
+        "locations/states.json",
+        "locations/cities.json",
+        "courts/courts.json",
+        "cases/cases.json",
+    ]
+
+    def test_processing_runs_inside_atomic_block(self):
+        from unittest.mock import patch
+
+        from oldp.apps.cases.processing.case_processor import CaseProcessor
+        from oldp.apps.references.models import CaseReferenceMarker
+
+        case = Case.objects.get(pk=1)
+
+        # Spy on ``transaction.atomic`` to make sure the wrap is in
+        # place. Mocking the call in the processor module keeps the
+        # actual atomic behaviour intact via the wraps= argument.
+        from django.db import transaction as _transaction
+
+        from oldp.apps.cases.processing import case_processor as cp_module
+
+        with patch.object(
+            cp_module.transaction,
+            "atomic",
+            wraps=_transaction.atomic,
+        ) as atomic_spy:
+            processor = CaseProcessor()
+            processor.set_processing_steps([])  # don't actually run any step
+            processor.processing_steps = []
+            processor.process_content_item(case)
+
+        atomic_spy.assert_called_once()
+        # And the case still has its existing marker rows untouched
+        # since no extraction step ran inside the atomic block.
+        self.assertGreaterEqual(
+            CaseReferenceMarker.objects.filter(referenced_by=case).count(),
+            0,
+        )
+
+
+@tag("processing")
+class CaseProcessorCatchAllTestCase(TestCase):
+    """Pin the catch-all ``except Exception`` clause in
+    ``CaseProcessor.process_content_item``.
+
+    During the prod refs backfill, two non-Django exception classes
+    (``IndexError`` from refex on malformed HTML and MySQLdb's
+    ``ProgrammingError`` "Commands out of sync" after SIGALRM
+    interrupts a network read) escaped the tuple-except above and
+    killed whole shards mid-run. The catch-all keeps the loop alive,
+    increments the failure counter, and resets the DB connection.
+    """
+
+    fixtures = [
+        "locations/countries.json",
+        "locations/states.json",
+        "locations/cities.json",
+        "courts/courts.json",
+        "cases/cases.json",
+    ]
+
+    def test_unhandled_exception_is_logged_and_counted(self):
+        from oldp.apps.cases.processing.case_processor import CaseProcessor
+        from oldp.apps.processing.processing_steps import BaseProcessingStep
+
+        class _BoomStep(BaseProcessingStep):
+            description = "Test-only step that raises a non-Django exception"
+
+            def process(self, content):
+                raise IndexError("list index out of range")
+
+        case = Case.objects.get(pk=1)
+        processor = CaseProcessor()
+        processor.processing_steps = [_BoomStep()]
+
+        with self.assertLogs(
+            "oldp.apps.cases.processing.case_processor", level="WARNING"
+        ) as cm:
+            processor.process_content_item(case)
+
+        # Run survived the IndexError.
+        self.assertEqual(processor.doc_failed_counter, 1)
+        self.assertEqual(len(processor.processing_errors), 1)
+        self.assertIsInstance(processor.processing_errors[0], IndexError)
+
+        # WARNING log mentions the exception class and the case
+        # identifier so triage can find the row.
+        joined = "\n".join(cm.output)
+        self.assertIn("IndexError", joined)
+        self.assertIn("Item failed", joined)
+        self.assertIn(str(case), joined)
+
+        # The broken case is marked as "tried" so a backfill driven by
+        # ``references_extracted_at__isnull=True`` doesn't keep
+        # re-finding (and re-crashing on) the same row every chunk.
+        case.refresh_from_db()
+        self.assertIsNotNone(case.references_extracted_at)

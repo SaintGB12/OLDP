@@ -1,0 +1,1243 @@
+"""Unit tests for the Case Creation API.
+
+Tests cover:
+- Successful case creation
+- Court resolution from name
+- Duplicate detection (409 Conflict)
+- Validation errors
+- Reference extraction (optional)
+- API token tracking
+- Authentication and permissions
+"""
+
+from datetime import date
+from unittest.mock import MagicMock, patch
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase, override_settings
+from rest_framework import status
+from rest_framework.test import APIClient, APITestCase
+
+from oldp.apps.accounts.models import (
+    APIToken,
+    APITokenPermission,
+    APITokenPermissionGroup,
+)
+from oldp.apps.cases.exceptions import CourtNotFoundError, DuplicateCaseError
+from oldp.apps.cases.models import Case
+from oldp.apps.cases.serializers import CaseCreateSerializer
+from oldp.apps.cases.services import CaseCreator, CourtResolver
+from oldp.apps.courts.apps import CourtTypes
+from oldp.apps.courts.models import Court, State
+from oldp.apps.sources.models import Source
+
+User = get_user_model()
+
+
+class _AliasCourtTypes(CourtTypes):
+    """The abbreviations the shortened-alias tests need (default has none)."""
+
+    def get_types(self):
+        return {
+            code: {"name": code, "levels": []}
+            for code in ("AG", "SG", "LSG", "VG", "OVG")
+        }
+
+
+class CourtResolverTestCase(TestCase):
+    """Tests for the CourtResolver service."""
+
+    fixtures = [
+        "locations/countries.json",
+        "locations/states.json",
+        "locations/cities.json",
+        "courts/courts.json",
+    ]
+
+    def setUp(self):
+        self.resolver = CourtResolver()
+
+    def test_remove_chamber_with_number(self):
+        """Test chamber extraction with numbered chamber."""
+        name = "LG Koblenz 14. Zivilkammer"
+        result_name, chamber = self.resolver.remove_chamber(name)
+        self.assertEqual(result_name, "LG Koblenz")
+        self.assertIsNotNone(chamber)
+        self.assertIn("14", chamber)
+
+    def test_remove_chamber_senat(self):
+        """Test chamber extraction with Senat designation."""
+        name = "OLG Koblenz 2. Senat für Bußgeldsachen"
+        result_name, chamber = self.resolver.remove_chamber(name)
+        self.assertEqual(result_name, "OLG Koblenz")
+        self.assertIsNotNone(chamber)
+
+    def test_remove_chamber_no_chamber(self):
+        """Test chamber extraction when no chamber present."""
+        name = "Amtsgericht Berlin"
+        result_name, chamber = self.resolver.remove_chamber(name)
+        self.assertEqual(result_name, "Amtsgericht Berlin")
+        self.assertIsNone(chamber)
+
+    def test_find_court_by_code(self):
+        """Test finding court by code."""
+        # Assuming there's a court with code in fixtures
+        courts = Court.objects.exclude(code="").exclude(code__isnull=True)
+        if courts.exists():
+            court = courts.first()
+            found = self.resolver.find_court("", court.code)
+            self.assertEqual(found.pk, court.pk)
+
+    def test_find_court_not_found_raises_error(self):
+        """Test that non-existent court raises CourtNotFoundError."""
+        with self.assertRaises(CourtNotFoundError):
+            self.resolver.find_court("Nonexistent Court XYZ 12345")
+
+    def test_find_court_empty_name_raises_error(self):
+        """Test that empty court name raises CourtNotFoundError."""
+        with self.assertRaises(CourtNotFoundError):
+            self.resolver.find_court("")
+
+    def test_find_court_falls_back_to_ecli(self):
+        """An unmatched name resolves via the court code embedded in the ECLI."""
+        court = self.resolver.find_court(
+            "Unbekanntes Gericht XYZ", ecli="ECLI:DE:BVerfG:2021:rk20210101.1bvr000121"
+        )
+        self.assertEqual(court.code, "BVerfG")
+
+    def test_find_court_ecli_used_for_empty_name(self):
+        """ECLI resolves the court even when the free-text name is empty."""
+        court = self.resolver.find_court("", ecli="ECLI:DE:BGH:2020:010120UXZR1.20.0")
+        self.assertEqual(court.code, "BGH")
+
+    def test_find_court_no_ecli_still_raises(self):
+        """An unmatched name with no usable ECLI still raises."""
+        with self.assertRaises(CourtNotFoundError):
+            self.resolver.find_court("Unbekanntes Gericht XYZ", ecli="not-an-ecli")
+
+    def test_resolve_extracts_chamber(self):
+        """Test that resolve method extracts chamber and finds court."""
+        # Get a valid court from fixtures
+        court = Court.objects.exclude(pk=Court.DEFAULT_ID).first()
+        if court:
+            # Mock find_court to return the court
+            with patch.object(self.resolver, "find_court", return_value=court):
+                found_court, chamber = self.resolver.resolve("LG Test 14. Zivilkammer")
+                self.assertEqual(found_court, court)
+
+    def test_remove_chamber_einzelrichter(self):
+        """Einzelrichter suffix should be stripped."""
+        name, chamber = self.resolver.remove_chamber("AG Frankfurt Einzelrichter")
+        self.assertEqual(name, "AG Frankfurt")
+        self.assertEqual(chamber, "Einzelrichter")
+
+    def test_remove_chamber_einzelrichterin(self):
+        """Einzelrichterin suffix should be stripped."""
+        name, chamber = self.resolver.remove_chamber("AG Berlin Einzelrichterin")
+        self.assertEqual(name, "AG Berlin")
+        self.assertEqual(chamber, "Einzelrichterin")
+
+    def test_remove_chamber_zivilabteilung(self):
+        """Zivilabteilung suffix should be stripped."""
+        name, chamber = self.resolver.remove_chamber("AG Frankfurt Zivilabteilung")
+        self.assertEqual(name, "AG Frankfurt")
+        self.assertEqual(chamber, "Zivilabteilung")
+
+    def test_remove_chamber_strafabteilung(self):
+        """Strafabteilung suffix should be stripped."""
+        name, chamber = self.resolver.remove_chamber("LG München Strafabteilung")
+        self.assertEqual(name, "LG München")
+        self.assertEqual(chamber, "Strafabteilung")
+
+    def test_remove_chamber_familienabteilung(self):
+        """Familienabteilung suffix should be stripped."""
+        name, chamber = self.resolver.remove_chamber("AG Berlin Familienabteilung")
+        self.assertEqual(name, "AG Berlin")
+        self.assertEqual(chamber, "Familienabteilung")
+
+    def test_remove_chamber_beschwerdesenat(self):
+        """Beschwerdesenat suffix should be stripped."""
+        name, chamber = self.resolver.remove_chamber("OLG Hamburg Beschwerdesenat")
+        self.assertEqual(name, "OLG Hamburg")
+        self.assertEqual(chamber, "Beschwerdesenat")
+
+    def test_remove_chamber_vergabesenat(self):
+        """Vergabesenat suffix should be stripped."""
+        name, chamber = self.resolver.remove_chamber("OLG Düsseldorf Vergabesenat")
+        self.assertEqual(name, "OLG Düsseldorf")
+        self.assertEqual(chamber, "Vergabesenat")
+
+    def test_remove_chamber_combined_number_and_suffix(self):
+        """Numbered chamber + suffix should both be stripped."""
+        name, chamber = self.resolver.remove_chamber("SG Frankfurt 23. Kammer")
+        self.assertEqual(name, "SG Frankfurt")
+        self.assertIn("23", chamber)
+
+    def test_find_court_by_alias(self):
+        """Court should be found via alias match."""
+        state = State.objects.first()
+        court = Court.objects.create(
+            name="SG Frankfurt am Main",
+            code="SGFFM",
+            slug="sg-frankfurt-am-main",
+            state=state,
+            court_type="SG",
+            aliases="SG Frankfurt\nSozialgericht Frankfurt",
+        )
+        found = self.resolver.find_court("SG Frankfurt")
+        self.assertEqual(found.pk, court.pk)
+
+    def test_find_court_alias_after_chamber_stripping(self):
+        """Court should be found after chamber suffix is stripped from name."""
+        state = State.objects.first()
+        court = Court.objects.create(
+            name="SG Frankfurt am Main",
+            code="SGFFM2",
+            slug="sg-frankfurt-am-main-2",
+            state=state,
+            court_type="SG",
+            aliases="SG Frankfurt\nSozialgericht Frankfurt",
+        )
+        found, chamber = self.resolver.resolve("SG Frankfurt Einzelrichter")
+        self.assertEqual(found.pk, court.pk)
+        self.assertEqual(chamber, "Einzelrichter")
+
+    def test_find_court_alias_with_numbered_chamber(self):
+        """Court should be found after numbered chamber is stripped."""
+        state = State.objects.first()
+        court = Court.objects.create(
+            name="SG Frankfurt am Main",
+            code="SGFFM3",
+            slug="sg-frankfurt-am-main-3",
+            state=state,
+            court_type="SG",
+            aliases="SG Frankfurt",
+        )
+        found, chamber = self.resolver.resolve("SG Frankfurt 23. Kammer")
+        self.assertEqual(found.pk, court.pk)
+        self.assertIn("23", chamber)
+
+    def test_alias_takes_precedence_over_city_match(self):
+        """Alias match should resolve before ambiguous city matching."""
+        state = State.objects.first()
+        court = Court.objects.create(
+            name="AG Teststadt am Main",
+            code="AGTSTM",
+            slug="ag-teststadt-am-main",
+            state=state,
+            court_type="AG",
+            aliases="AG Teststadt",
+        )
+        found = self.resolver.find_court("AG Teststadt")
+        self.assertEqual(found.pk, court.pk)
+
+    def test_alias_substring_match_is_rejected(self):
+        """A name that only appears *inside* an alias must not resolve.
+
+        Regression for #256: "VG Berlin" is a substring of the OVG's alias
+        "OVG Berlin", and Verwaltungsgericht Berlin carries no aliases of its
+        own, so an unanchored match sent ~6,100 first-instance decisions to
+        the appellate court.
+        """
+        state = State.objects.first()
+        ovg = Court.objects.create(
+            name="Oberverwaltungsgericht Berlin-Brandenburg",
+            code="OVGBEBB-T",
+            slug="ovgbebb-t",
+            state=state,
+            court_type="OVG",
+            aliases="Oberverwaltungsgericht Berlin-Brandenburg\nOVG Berlin",
+        )
+        Court.objects.create(
+            name="Verwaltungsgericht Berlin",
+            code="VGBE-T",
+            slug="vgbe-t",
+            state=state,
+            court_type="VG",
+        )
+
+        self.assertIsNone(self.resolver._find_by_alias("VG Berlin"))
+        self.assertEqual(self.resolver._find_by_alias("OVG Berlin").pk, ovg.pk)
+
+    def test_alias_blank_name_is_rejected(self):
+        """A blank name must not match a court that has a blank alias line."""
+        state = State.objects.first()
+        Court.objects.create(
+            name="AG Leerzeile",
+            code="AGLZ",
+            slug="ag-leerzeile",
+            state=state,
+            court_type="AG",
+            aliases="AG Leerzeile\n\nAmtsgericht Leerzeile",
+        )
+
+        self.assertIsNone(self.resolver._find_by_alias("   "))
+
+    @override_settings(COURT_TYPES=_AliasCourtTypes())
+    def test_alias_shortened_name_of_same_type_resolves(self):
+        """A shortened name resolves when it is whole words of one court's alias.
+
+        Portals send "AG Bingen" for "Amtsgericht Bingen am Rhein"; the city
+        lookup needs the full city name, so the alias is the only route.
+        """
+        state = State.objects.first()
+        court = Court.objects.create(
+            name="Amtsgericht Bingen am Rhein",
+            code="AGBINGE-T",
+            slug="agbinge-t",
+            state=state,
+            court_type="AG",
+            aliases="AG Bingen am Rhein\nAG Bingen (Rhein)",
+        )
+
+        self.assertEqual(self.resolver._find_by_alias("AG Bingen").pk, court.pk)
+
+    @override_settings(COURT_TYPES=_AliasCourtTypes())
+    def test_alias_shortened_name_of_other_type_is_rejected(self):
+        """A shortened match against a court of another type must not resolve.
+
+        "SG Saarbrücken" is whole words of the LSG's alias
+        "LSG Saarbrücken (Landessozialgericht)" only if the type is ignored.
+        """
+        state = State.objects.first()
+        Court.objects.create(
+            name="Landessozialgericht für das Saarland",
+            code="LSGSL-T",
+            slug="lsgsl-t",
+            state=state,
+            court_type="LSG",
+            aliases="SG Saarbrücken Landessozialgericht",
+        )
+
+        self.assertIsNone(self.resolver._find_by_alias("SG Saarbrücken"))
+
+    @override_settings(COURT_TYPES=_AliasCourtTypes())
+    def test_alias_shortened_name_must_end_on_word_boundary(self):
+        """AG Berlin must not pick the one court aliased AG Berlin-Mitte."""
+        state = State.objects.first()
+        Court.objects.create(
+            name="Amtsgericht Mitte",
+            code="AGBEMI-T",
+            slug="agbemi-t",
+            state=state,
+            court_type="AG",
+            aliases="AG Berlin-Mitte",
+        )
+
+        self.assertIsNone(self.resolver._find_by_alias("AG Berlin"))
+
+    @override_settings(COURT_TYPES=_AliasCourtTypes())
+    def test_alias_shortened_name_matching_two_courts_is_rejected(self):
+        state = State.objects.first()
+        for code, alias in (
+            ("AGNEA-T", "AG Neustadt an der Aisch"),
+            ("AGNEW-T", "AG Neustadt an der Weinstraße"),
+        ):
+            Court.objects.create(
+                name=alias,
+                code=code,
+                slug=code.lower(),
+                state=state,
+                court_type="AG",
+                aliases=alias,
+            )
+
+        self.assertIsNone(self.resolver._find_by_alias("AG Neustadt"))
+
+    def test_find_court_ambiguous_name_no_other_signal_raises(self):
+        """If every strategy is inconclusive, raise CourtNotFoundError (NOT 500)."""
+        state = State.objects.first()
+        # Same exact name with no extractable court type prefix — every
+        # downstream resolution strategy (alias, type+state, type+city,
+        # partial-name) returns None, so we end up at the final raise.
+        Court.objects.create(
+            name="Zweideutiges Gericht",
+            code="ZG-A",
+            slug="zg-a",
+            state=state,
+            court_type="",
+        )
+        Court.objects.create(
+            name="Zweideutiges Gericht",
+            code="ZG-B",
+            slug="zg-b",
+            state=state,
+            court_type="",
+        )
+        with self.assertRaises(CourtNotFoundError):
+            self.resolver.find_court("Zweideutiges Gericht")
+
+    def test_find_court_ambiguous_name_resolves_via_unique_code(self):
+        """Two name-twins coexisting shouldn't break code-based resolution."""
+        state = State.objects.first()
+        Court.objects.create(
+            name="Doppelgänger Gericht",
+            code="DG-A",
+            slug="dg-a",
+            state=state,
+            court_type="OLG",
+        )
+        winner = Court.objects.create(
+            name="Doppelgänger Gericht",
+            code="DG-B",
+            slug="dg-b",
+            state=state,
+            court_type="OLG",
+        )
+        found = self.resolver.find_court(
+            court_name="Doppelgänger Gericht", court_code="DG-B"
+        )
+        self.assertEqual(found.pk, winner.pk)
+
+
+class CaseCreatorTestCase(TestCase):
+    """Tests for the CaseCreator service."""
+
+    fixtures = [
+        "locations/countries.json",
+        "locations/states.json",
+        "locations/cities.json",
+        "courts/courts.json",
+    ]
+
+    def setUp(self):
+        self.creator = CaseCreator(extract_refs=False)
+        self.court = Court.objects.exclude(pk=Court.DEFAULT_ID).first()
+
+    def test_check_duplicate_returns_false_for_new_case(self):
+        """Test duplicate check returns False for non-existent case."""
+        result = self.creator.check_duplicate(self.court, "UNIQUE-FILE-123/99")
+        self.assertFalse(result)
+
+    def test_check_duplicate_returns_true_for_existing_case(self):
+        """Test duplicate check returns True for existing case."""
+        Case.objects.create(
+            court=self.court,
+            file_number="EXISTING-FILE-123/99",
+            date=date(2021, 1, 1),
+            content="<p>Test content</p>",
+        )
+        result = self.creator.check_duplicate(self.court, "EXISTING-FILE-123/99")
+        self.assertTrue(result)
+
+    def test_create_case_success(self):
+        """Test successful case creation."""
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            case = self.creator.create_case(
+                court_name=self.court.name,
+                file_number="NEW-FILE-456/21",
+                date=date(2021, 5, 15),
+                content="<p>Case content</p>",
+                case_type="Urteil",
+            )
+
+            self.assertIsNotNone(case.pk)
+            self.assertEqual(case.court, self.court)
+            self.assertEqual(case.file_number, "NEW-FILE-456/21")
+            self.assertEqual(case.type, "Urteil")
+            self.assertIsNotNone(case.slug)
+
+    def test_create_case_duplicate_raises_error(self):
+        """Test that creating duplicate case raises DuplicateCaseError."""
+        # Create initial case
+        Case.objects.create(
+            court=self.court,
+            file_number="DUP-FILE-789/21",
+            date=date(2021, 1, 1),
+            content="<p>Original content</p>",
+        )
+
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            with self.assertRaises(DuplicateCaseError):
+                self.creator.create_case(
+                    court_name=self.court.name,
+                    file_number="DUP-FILE-789/21",
+                    date=date(2021, 5, 15),
+                    content="<p>Duplicate content</p>",
+                )
+
+    def test_create_case_slug_collision_raises_duplicate_error(self):
+        """Test that a slug collision on save raises DuplicateCaseError (not IntegrityError).
+
+        This happens when two different file_numbers produce the same
+        truncated slug after slugify strips punctuation.  For example,
+        "IX R 11/25, XI R 26/23" and "IX R 11/25 (XI R 26/23)" differ
+        only in comma vs parenthesis — both slugify to the same value
+        within the first 20 characters used by set_slug().
+        """
+        # Create initial case with comma-separated file number
+        Case.objects.create(
+            court=self.court,
+            file_number="IX R 11/25, XI R 26/23",
+            date=date(2025, 12, 4),
+            content="<p>Original content</p>",
+        )
+
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            # Parenthesised variant — different file_number, same slug
+            with self.assertRaises(DuplicateCaseError):
+                self.creator.create_case(
+                    court_name=self.court.name,
+                    file_number="IX R 11/25 (XI R 26/23), IX R 11/25, XI R 26/23",
+                    date=date(2025, 12, 4),
+                    content="<p>Duplicate via slug</p>",
+                )
+
+    def test_create_case_with_api_token_tracking(self):
+        """Test that API token is tracked on created case."""
+        user = User.objects.create_user(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+        token = APIToken.objects.create(user=user, name="Test Token")
+
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            case = self.creator.create_case(
+                court_name=self.court.name,
+                file_number="TOKEN-FILE-111/21",
+                date=date(2021, 5, 15),
+                content="<p>Case content</p>",
+                api_token=token,
+            )
+
+            self.assertEqual(case.created_by_token, token)
+            # Cases created with API token are pending review (require approval)
+            self.assertEqual(case.review_status, "pending")
+
+    def test_create_case_sets_slug(self):
+        """Test that slug is set correctly on created case."""
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            case = self.creator.create_case(
+                court_name=self.court.name,
+                file_number="SLUG-TEST-222/21",
+                date=date(2021, 5, 15),
+                content="<p>Case content</p>",
+            )
+
+            self.assertIsNotNone(case.slug)
+            self.assertIn(self.court.slug, case.slug)
+            self.assertIn("2021-05-15", case.slug)
+
+    def test_create_case_default_source(self):
+        """Test that default source is assigned when source_name is omitted."""
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            case = self.creator.create_case(
+                court_name=self.court.name,
+                file_number="SRC-DEFAULT-001/21",
+                date=date(2021, 5, 15),
+                content="<p>Case content</p>",
+            )
+
+            self.assertEqual(case.source_id, Source.DEFAULT_ID)
+
+    def test_create_case_new_source_created(self):
+        """Test that a new source is created when name does not exist."""
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            case = self.creator.create_case(
+                court_name=self.court.name,
+                file_number="SRC-NEW-002/21",
+                date=date(2021, 5, 15),
+                content="<p>Case content</p>",
+                source_name="Brand New Source",
+                source_homepage="https://newsource.example.com",
+            )
+
+            self.assertEqual(case.source.name, "Brand New Source")
+            self.assertEqual(case.source.homepage, "https://newsource.example.com")
+            self.assertTrue(Source.objects.filter(name="Brand New Source").exists())
+
+    def test_create_case_existing_source_matched(self):
+        """Test that an existing source is reused when name matches."""
+        existing = Source.objects.create(
+            name="Existing Source", homepage="https://existing.example.com"
+        )
+        with patch.object(
+            self.creator.court_resolver, "resolve", return_value=(self.court, None)
+        ):
+            case = self.creator.create_case(
+                court_name=self.court.name,
+                file_number="SRC-EXIST-003/21",
+                date=date(2021, 5, 15),
+                content="<p>Case content</p>",
+                source_name="Existing Source",
+                source_homepage="https://different-url.example.com",
+            )
+
+            self.assertEqual(case.source_id, existing.pk)
+            # Homepage should not be updated on existing source
+            existing.refresh_from_db()
+            self.assertEqual(existing.homepage, "https://existing.example.com")
+
+    def test_resolve_source_creates_with_homepage(self):
+        """Test resolve_source creates source with provided homepage."""
+        source = self.creator.resolve_source("Test Source", "https://test.example.com")
+        self.assertEqual(source.name, "Test Source")
+        self.assertEqual(source.homepage, "https://test.example.com")
+
+    def test_resolve_source_reuses_existing(self):
+        """Test resolve_source returns existing source by name."""
+        existing = Source.objects.create(
+            name="Reuse Source", homepage="https://reuse.example.com"
+        )
+        source = self.creator.resolve_source(
+            "Reuse Source", "https://other.example.com"
+        )
+        self.assertEqual(source.pk, existing.pk)
+
+
+class CaseCreateSerializerTestCase(TestCase):
+    """Tests for the CaseCreateSerializer."""
+
+    def test_valid_data(self):
+        """Test serializer with valid data."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+            "type": "Urteil",
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_missing_required_field(self):
+        """Test serializer rejects missing required fields."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            # Missing file_number, date, content
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("file_number", serializer.errors)
+        self.assertIn("date", serializer.errors)
+        self.assertIn("content", serializer.errors)
+
+    def test_empty_court_name_rejected(self):
+        """Test serializer rejects empty court name."""
+        data = {
+            "court_name": "",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content</p>",
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("court_name", serializer.errors)
+
+    def test_content_too_short(self):
+        """Test serializer rejects content that is too short."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "short",  # Less than 10 characters
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("content", serializer.errors)
+
+    @override_settings(CASE_CREATION_VALIDATION={"content_min_length": 5})
+    def test_content_validation_uses_settings(self):
+        """Test that content validation respects settings."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "12345",  # Exactly 5 characters
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_valid_data_with_source_url(self):
+        """Test serializer accepts optional source_url field."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+            "source_url": "https://example.com/case/123",
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(
+            serializer.validated_data["source_url"], "https://example.com/case/123"
+        )
+
+    def test_source_url_invalid_url_rejected(self):
+        """Test serializer rejects malformed source_url."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+            "source_url": "not-a-url",
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("source_url", serializer.errors)
+
+    def test_valid_data_with_source(self):
+        """Test serializer accepts optional source field."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+            "source": {"name": "My Scraper", "homepage": "https://example.com"},
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data["source"]["name"], "My Scraper")
+
+    def test_valid_data_with_source_name_only(self):
+        """Test serializer accepts source with name only (no homepage)."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+            "source": {"name": "My Scraper"},
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_source_empty_name_rejected(self):
+        """Test serializer rejects source with empty name."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+            "source": {"name": ""},
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("source", serializer.errors)
+
+    def test_source_name_too_long_rejected(self):
+        """Test serializer rejects source name exceeding 100 characters."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+            "source": {"name": "x" * 101},
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("source", serializer.errors)
+
+    def test_valid_data_without_source(self):
+        """Test serializer is valid when source is omitted."""
+        data = {
+            "court_name": "Bundesgerichtshof",
+            "file_number": "I ZR 123/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content with sufficient length</p>",
+        }
+        serializer = CaseCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertNotIn("source", serializer.validated_data)
+
+
+class CaseCreationAPITestCase(APITestCase):
+    """Integration tests for the Case Creation API endpoint."""
+
+    fixtures = [
+        "locations/countries.json",
+        "locations/states.json",
+        "locations/cities.json",
+        "courts/courts.json",
+    ]
+
+    def setUp(self):
+        # Create user
+        self.user = User.objects.create_user(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+
+        # Create permission and permission group for write access
+        self.write_permission, _ = APITokenPermission.objects.get_or_create(
+            resource="cases", action="write"
+        )
+        self.permission_group = APITokenPermissionGroup.objects.create(
+            name="test_write_group"
+        )
+        self.permission_group.permissions.add(self.write_permission)
+
+        # Create API token with write permission
+        self.token = APIToken.objects.create(
+            user=self.user,
+            name="Test Token",
+            permission_group=self.permission_group,
+        )
+
+        self.client = APIClient()
+        # Use force_authenticate to set both user and token (request.auth)
+        self.client.force_authenticate(user=self.user, token=self.token)
+
+        # Get a valid court for testing
+        self.court = Court.objects.exclude(pk=Court.DEFAULT_ID).first()
+
+    def _get_valid_case_data(self, file_number=None):
+        """Helper to get valid case creation data."""
+        return {
+            "court_name": self.court.name,
+            "file_number": file_number or "TEST-FILE-123/21",
+            "date": "2021-05-15",
+            "content": "<p>Test case content with sufficient length for validation</p>",
+            "type": "Urteil",
+        }
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_success(self, mock_create):
+        """Test successful case creation returns 201 with id and slug."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-court-2021-05-15-test-file-123-21"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("id", response.data)
+        self.assertIn("slug", response.data)
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_duplicate_returns_409(self, mock_create):
+        """Test duplicate case returns 409 Conflict."""
+        mock_create.side_effect = DuplicateCaseError(
+            "A case with this court and file number already exists."
+        )
+
+        data = self._get_valid_case_data()
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_court_not_found_returns_400(self, mock_create):
+        """Test court not found returns 400 Bad Request."""
+        mock_create.side_effect = CourtNotFoundError(
+            "Could not resolve court from name."
+        )
+
+        data = self._get_valid_case_data()
+        data["court_name"] = "Nonexistent Court XYZ 12345"
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_case_missing_required_fields_returns_400(self):
+        """Test missing required fields returns 400 Bad Request."""
+        data = {"court_name": "Test Court"}  # Missing other required fields
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("file_number", response.data)
+        self.assertIn("date", response.data)
+        self.assertIn("content", response.data)
+
+    def test_create_case_without_authentication_returns_401(self):
+        """Test unauthenticated request returns 401."""
+        # Clear authentication
+        self.client.force_authenticate(user=None, token=None)
+        data = self._get_valid_case_data()
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_case_without_write_permission_returns_403(self):
+        """Test request without write permission returns 403."""
+        # Create token without write permission
+        read_permission, _ = APITokenPermission.objects.get_or_create(
+            resource="cases", action="read"
+        )
+        read_only_group = APITokenPermissionGroup.objects.create(name="read_only_group")
+        read_only_group.permissions.add(read_permission)
+
+        read_only_token = APIToken.objects.create(
+            user=self.user, name="Read Only Token", permission_group=read_only_group
+        )
+
+        # Use force_authenticate with the read-only token
+        self.client.force_authenticate(user=self.user, token=read_only_token)
+
+        data = self._get_valid_case_data()
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_tracks_api_token(self, mock_create):
+        """Test that API token is passed to case creator."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-slug"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+        self.client.post("/api/cases/", data, format="json")
+
+        # Verify create_case was called with api_token
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args[1]
+        self.assertEqual(call_kwargs["api_token"], self.token)
+
+    def test_create_case_content_too_short_returns_400(self):
+        """Test content validation returns 400 for short content."""
+        data = self._get_valid_case_data()
+        data["content"] = "short"  # Less than minimum length
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("content", response.data)
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_with_all_optional_fields(self, mock_create):
+        """Test case creation with all optional fields."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-slug"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+        data.update(
+            {
+                "ecli": "ECLI:DE:BGH:2021:150521UTEST123.21.0",
+                "abstract": "<p>Case abstract summary</p>",
+                "title": "Test Case Title",
+            }
+        )
+
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify all fields were passed to create_case
+        call_kwargs = mock_create.call_args[1]
+        self.assertEqual(call_kwargs["ecli"], data["ecli"])
+        self.assertEqual(call_kwargs["abstract"], data["abstract"])
+        self.assertEqual(call_kwargs["title"], data["title"])
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_extract_refs_disabled_via_query_param(self, mock_create):
+        """Test that extract_refs can be disabled via query parameter."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-slug"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+
+        # Use query parameter to disable extract_refs
+        self.client.post("/api/cases/?extract_refs=false", data, format="json")
+
+        call_kwargs = mock_create.call_args[1]
+        self.assertFalse(call_kwargs["extract_refs"])
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_extract_refs_enabled_by_default(self, mock_create):
+        """Test that extract_refs is enabled by default."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-slug"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+
+        self.client.post("/api/cases/", data, format="json")
+
+        call_kwargs = mock_create.call_args[1]
+        self.assertTrue(call_kwargs["extract_refs"])
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_with_source_passes_to_creator(self, mock_create):
+        """Test that source data is passed through to case creator."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-slug"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+        data["source"] = {"name": "Test Source", "homepage": "https://test.example.com"}
+
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        call_kwargs = mock_create.call_args[1]
+        self.assertEqual(call_kwargs["source_name"], "Test Source")
+        self.assertEqual(call_kwargs["source_homepage"], "https://test.example.com")
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_without_source_passes_none(self, mock_create):
+        """Test that omitting source passes None to creator."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-slug"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+        response = self.client.post("/api/cases/", data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        call_kwargs = mock_create.call_args[1]
+        self.assertIsNone(call_kwargs["source_name"])
+        self.assertIsNone(call_kwargs["source_homepage"])
+
+    @patch("oldp.apps.cases.services.case_creator.CaseCreator.create_case")
+    def test_create_case_extract_refs_query_param_variations(self, mock_create):
+        """Test various values for extract_refs query parameter."""
+        mock_case = MagicMock()
+        mock_case.id = 12345
+        mock_case.slug = "test-slug"
+        mock_create.return_value = mock_case
+
+        data = self._get_valid_case_data()
+
+        # Test "0" disables
+        self.client.post("/api/cases/?extract_refs=0", data, format="json")
+        self.assertFalse(mock_create.call_args[1]["extract_refs"])
+
+        # Test "no" disables
+        mock_create.reset_mock()
+        self.client.post("/api/cases/?extract_refs=no", data, format="json")
+        self.assertFalse(mock_create.call_args[1]["extract_refs"])
+
+        # Test "true" enables
+        mock_create.reset_mock()
+        self.client.post("/api/cases/?extract_refs=true", data, format="json")
+        self.assertTrue(mock_create.call_args[1]["extract_refs"])
+
+
+class CaseCreationIntegrationTestCase(APITestCase):
+    """Full integration tests for case creation without mocking.
+
+    These tests verify the complete flow from API to database.
+    """
+
+    fixtures = [
+        "locations/countries.json",
+        "locations/states.json",
+        "locations/cities.json",
+        "courts/courts.json",
+    ]
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="integrationuser",
+            email="integration@example.com",
+            password="testpass",
+        )
+
+        write_permission, _ = APITokenPermission.objects.get_or_create(
+            resource="cases", action="write"
+        )
+        permission_group = APITokenPermissionGroup.objects.create(
+            name="integration_write_group"
+        )
+        permission_group.permissions.add(write_permission)
+
+        self.token = APIToken.objects.create(
+            user=self.user, name="Integration Token", permission_group=permission_group
+        )
+
+        self.client = APIClient()
+        # Use force_authenticate to set both user and token (request.auth)
+        self.client.force_authenticate(user=self.user, token=self.token)
+
+        self.court = Court.objects.exclude(pk=Court.DEFAULT_ID).first()
+
+    def test_full_case_creation_flow(self):
+        """Test complete case creation from API to database."""
+        data = {
+            "court_name": self.court.name,
+            "file_number": "INTEGRATION-TEST-999/21",
+            "date": "2021-05-15",
+            "content": "<p>Integration test case content with references to § 823 BGB</p>",
+            "type": "Urteil",
+        }
+
+        # Use query param to disable ref extraction for faster test
+        response = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify case was created in database
+        case_id = response.data["id"]
+        case = Case.objects.get(pk=case_id)
+
+        self.assertEqual(case.court, self.court)
+        self.assertEqual(case.file_number, "INTEGRATION-TEST-999/21")
+        self.assertEqual(str(case.date), "2021-05-15")
+        self.assertEqual(case.type, "Urteil")
+        self.assertEqual(case.created_by_token, self.token)
+        self.assertIsNotNone(case.slug)
+        # API-created cases require manual approval (review_status=pending)
+        self.assertEqual(case.review_status, "pending")
+
+    def test_api_created_cases_are_pending_by_default(self):
+        """Test that cases created via API are always pending (require approval)."""
+        data = {
+            "court_name": self.court.name,
+            "file_number": "PENDING-TEST-777/21",
+            "date": "2021-05-15",
+            "content": "<p>Test case content</p>",
+        }
+
+        response = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify case is pending review
+        case = Case.objects.get(pk=response.data["id"])
+        self.assertEqual(
+            case.review_status,
+            "pending",
+            "API-created cases must be pending for approval workflow",
+        )
+
+    def test_source_url_persisted_when_provided(self):
+        """source_url from the request payload is stored on the Case row."""
+        data = {
+            "court_name": self.court.name,
+            "file_number": "SOURCE-URL-001/21",
+            "date": "2021-05-15",
+            "content": "<p>Case with source URL</p>",
+            "source_url": "https://www.rechtsprechung-im-internet.de/docs/bsjrs/jb-KORE600682026.zip",
+        }
+        response = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        case = Case.objects.get(pk=response.data["id"])
+        self.assertEqual(case.source_url, data["source_url"])
+
+    def test_source_url_optional_defaults_to_empty(self):
+        """Omitting source_url stays backwards-compatible (stored as '')."""
+        data = {
+            "court_name": self.court.name,
+            "file_number": "SOURCE-URL-002/21",
+            "date": "2021-05-15",
+            "content": "<p>Case without source URL</p>",
+        }
+        response = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        case = Case.objects.get(pk=response.data["id"])
+        self.assertEqual(case.source_url, "")
+
+    def test_duplicate_case_prevention(self):
+        """Test that duplicate cases are prevented."""
+        data = {
+            "court_name": self.court.name,
+            "file_number": "DUPLICATE-TEST-888/21",
+            "date": "2021-05-15",
+            "content": "<p>First case content</p>",
+        }
+
+        # Create first case (disable ref extraction for faster test)
+        response1 = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+        self.assertEqual(response1.status_code, status.HTTP_201_CREATED)
+
+        # Try to create duplicate
+        response2 = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+        self.assertEqual(response2.status_code, status.HTTP_409_CONFLICT)
+
+        # Verify only one case exists
+        count = Case.objects.filter(
+            court=self.court, file_number="DUPLICATE-TEST-888/21"
+        ).count()
+        self.assertEqual(count, 1)
+
+    def test_case_creation_with_new_source(self):
+        """Test that providing a new source name creates the source and assigns it."""
+        data = {
+            "court_name": self.court.name,
+            "file_number": "SOURCE-NEW-001/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content for source test</p>",
+            "source": {
+                "name": "Integration Test Source",
+                "homepage": "https://integration.example.com",
+            },
+        }
+
+        response = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        case = Case.objects.get(pk=response.data["id"])
+        self.assertEqual(case.source.name, "Integration Test Source")
+        self.assertEqual(case.source.homepage, "https://integration.example.com")
+
+    def test_case_creation_with_existing_source(self):
+        """Test that providing an existing source name reuses it."""
+        existing_source = Source.objects.create(
+            name="Pre-Existing Source", homepage="https://preexisting.example.com"
+        )
+
+        data = {
+            "court_name": self.court.name,
+            "file_number": "SOURCE-EXIST-002/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content for existing source test</p>",
+            "source": {
+                "name": "Pre-Existing Source",
+                "homepage": "https://different.example.com",
+            },
+        }
+
+        response = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        case = Case.objects.get(pk=response.data["id"])
+        self.assertEqual(case.source_id, existing_source.pk)
+        # Homepage of existing source should not change
+        existing_source.refresh_from_db()
+        self.assertEqual(existing_source.homepage, "https://preexisting.example.com")
+
+    def test_case_creation_without_source_uses_default(self):
+        """Test that omitting source assigns the default source."""
+        data = {
+            "court_name": self.court.name,
+            "file_number": "SOURCE-DEFAULT-003/21",
+            "date": "2021-05-15",
+            "content": "<p>Case content without source</p>",
+        }
+
+        response = self.client.post(
+            "/api/cases/?extract_refs=false", data, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        case = Case.objects.get(pk=response.data["id"])
+        self.assertEqual(case.source_id, Source.DEFAULT_ID)

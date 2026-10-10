@@ -1,0 +1,131 @@
+{% extends "layout.html" %}
+
+{% load static %}
+{% load i18n %}
+{% load html_filters %}
+
+{% block search_form %}
+    {% with sidebar=1 sidebar_toggle_icon='fa-info-circle' %}
+        {% include 'includes/search_form.html' %}
+    {% endwith %}
+{% endblock %}
+
+{% block sidebar %}
+    <nav class="collapse nav-sidebar" id="sidebar">
+        <div class="sidebar-title">{{ item.book.title }}</div>
+
+        <ul>
+        {% if item.has_previous %}
+        <li>
+            <a href="{{ item.get_previous.get_absolute_url }}">{{ item.get_previous.get_short_title }}</a>
+        </li>
+        {% endif %}
+        <li>
+            <a href="{{ item.book.get_absolute_url }}">
+                {{ item.book.code }}
+            </a>
+        </li>
+        {% if item.has_next %}
+        <li>
+            <a href="{{ item.get_next.get_absolute_url }}">{{ item.get_next.get_short_title }}</a>
+        </li>
+        {% endif %}
+
+
+
+        {% if item.book.get_changelog %}
+            <li>{% trans 'Changelog' %}: <i>{{ item.book.get_changelog_text }}</i></li>
+        {% endif %}
+
+        </ul>
+
+
+        <div class="sidebar-title">{% trans 'Revisions' %}</div>
+
+        <ul class="revision-dates">
+            {% for rev_date in revision_dates %}
+            <li class="{% if forloop.counter0 > 5 %}readmore{% endif %}"><a href="?revision_date={{ rev_date|date:'Y-m-d' }}">{{ rev_date }}{% if rev_date == item.book.revision_date %}&nbsp;<i class="fa fa-check" aria-hidden="true" title="{% trans 'selected' %}"></i><span class="sr-only">{% trans 'selected' %}</span>{% endif %}</a></li>
+            {% endfor %}
+            <!--<li><a href="">25. August 2017</a></li>-->
+        </ul>
+        {% if revision_dates|length > 5 %}
+            <p><button class="btn btn-sm btn-default" onclick="$('.revision-dates .readmore').show(); $(this).hide();">{% trans 'btn_show_all' %}</button></p>
+        {% endif %}
+
+        <div class="meta-data">
+            <div class="meta-item-2c">
+                <label>{% trans 'API' %}: </label>
+                <div class="meta-value">
+                    <a href="{{ item.get_api_url }}" rel="nofollow"><i class="fa fa-file"></i> JSON</a>
+                </div>
+            </div>
+        </div>
+
+    </nav>
+
+{% endblock %}
+
+{% block breadcrumbs %}
+    <nav class="breadcrumbs d-none d-md-block">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <i class="fa fa-home"></i> <a href="{% url 'homepage:index' %}">{% trans 'Home' %}</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'laws:index' %}">{% trans 'Laws' %}</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{{ item.book.get_absolute_url }}">{{ item.book.code }}</a>
+        </li>
+        <li class="breadcrumb-item">{{ item.section }}</li>
+      </ol>
+    </nav>
+{% endblock %}
+
+{% block content %}
+
+{% include 'admin_bar.html' %}
+
+<div class="alert alert-warning">
+    <strong>{% trans 'Warning:' %}</strong> {% trans 'law_outdated_warning' %}
+</div>
+
+{% if not item.book.latest %}
+<div class="alert alert-warning">
+    {% blocktrans with url=item.get_latest_revision_url %}You are currently viewing an <strong>outdated revision</strong> of this law. Click <a href="{{ url }}">here</a> to view the latest revision.{% endblocktrans %}
+</div>
+{% endif %}
+<section>
+    <div class="title-center">
+        <h2>{{ item.get_title }}</h2>
+        <h4>{{ item.book.title }}</h4>
+    </div>
+
+
+    {% if not item.is_disabled %}
+        <article class="text-justify">
+            {{ item.get_html_content|sanitize_html }}
+        </article>
+
+        {% if item.get_footnotes %}
+        <br>
+        <hr>
+        {% for footnote in item.get_footnotes %}
+        <p class="small">{{ footnote }}</p>
+        {% endfor %}
+
+        {% endif %}
+
+    {% endif %}
+
+
+</section>
+
+
+{% if item.is_disabled %}
+    <div class="alert alert-warning text-center">{% trans 'This law is deprecated.' %}</div>
+{% endif %}
+
+{% include 'laws/references.html' %}
+
+{% endblock %}

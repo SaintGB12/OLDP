@@ -1,0 +1,73 @@
+from datetime import datetime
+
+from dateutil.relativedelta import relativedelta
+from django import template
+from django.conf import settings
+from django.template.defaultfilters import urlencode
+from django.urls import reverse
+from haystack.models import SearchResult
+from haystack.utils.highlighting import Highlighter
+
+register = template.Library()
+
+
+@register.simple_tag
+def search_example_queries():
+    """Homepage example search queries, configured per deployment.
+
+    Returns the ``SEARCH_EXAMPLE_QUERIES`` setting (env-configurable via
+    ``DJANGO_SEARCH_EXAMPLE_QUERIES``). Empty when unset, so the template can
+    fall back to the translated ``search_example_queryN`` strings.
+    """
+    return getattr(settings, "SEARCH_EXAMPLE_QUERIES", None) or []
+
+
+@register.filter
+def get_search_snippet(search_result: SearchResult, query: str) -> str:
+    # Prefer ES-native highlighted text (avoids transferring full document content)
+    if hasattr(search_result, "highlighted") and search_result.highlighted:
+        return search_result.highlighted[0]
+
+    # Fallback to Python-side highlighting (used by mock backend)
+    if (
+        search_result
+        and hasattr(search_result, "get_stored_fields")
+        and "text" in search_result.get_stored_fields()
+    ):
+        hlr = Highlighter(query, html_tag="strong")
+        return hlr.highlight(search_result.get_stored_fields()["text"])
+
+    return ""
+
+
+@register.filter
+def format_date(start_date: datetime) -> str:
+    """Format for search facets (year-month)"""
+    return start_date.strftime("%Y-%m")
+
+
+@register.filter
+def date_range_query(start_date: datetime, date_format="%Y-%m-%d") -> str:
+    """Monthly range"""
+    return (
+        start_date.strftime(date_format)
+        + ","
+        + (start_date + relativedelta(months=1)).strftime(date_format)
+    )
+
+
+@register.filter
+def search_url(query):
+    return reverse("haystack_search") + "?q=" + urlencode(query)
+
+
+@register.filter
+def filter_zero_count_facets(facet_list):
+    """Given [(label, count), ...], returns only those with count > 0."""
+    try:
+        filtered = [(label, cnt) for label, cnt in facet_list if cnt > 0]
+
+        # Sort by count, descending
+        return sorted(filtered, key=lambda pair: pair[1], reverse=True)
+    except Exception:
+        return facet_list

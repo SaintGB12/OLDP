@@ -1,0 +1,36 @@
+{% load static %}
+{% load i18n %}
+{% load contact %}
+{% load cache %}
+
+{% block footer %}
+
+    {% cache 3600 footer %}
+    <footer class="bd-footer text-muted">
+        <div class="container-fluid p-3 p-md-5">
+            <ul class="bd-footer-links">
+
+                <li><a href="{% url 'contact:form' %}">{% trans 'Contact' %}</a></li>
+                <li><a href="{% url 'markdown_page' slug='imprint' %}">{% trans 'Imprint' %}</a></li>
+                <li><a href="{% url 'markdown_page' slug='privacy' %}">{% trans 'Privacy' %}</a></li>
+                <li><a href="{% url 'markdown_page' slug='terms' %}">{% trans 'Terms' %}</a></li>
+                <li><a href="{% report_content_url %}" rel="nofollow">{% trans 'Report content' %}</a></li>
+
+                <li><a href="{{ api_info_url }}">API</a></li>
+                <li><a href="{{ site_mcp_docs_url }}" target="_blank" rel="noopener">MCP</a></li>
+                <li><a href="{% url 'cases:stats' %}"><i class="fa-solid fa-chart-bar" aria-hidden="true"></i> {% trans 'Statistics' %}</a></li>
+
+                <li><a href="{{ site_blog_url }}">Blog</a></li>
+
+                <li><a href="{{ site_discord_url }}"><i class="fa-brands fa-discord" aria-hidden="true"></i> Discord</a></li>
+                <li><a href="{{ site_github_url }}"><i class="fa-brands fa-github" aria-hidden="true"></i> GitHub</a></li>
+                <li><a href="{{ site_linkedin_url }}"><i class="fa-brands fa-linkedin" aria-hidden="true"></i> LinkedIn</a></li>
+
+            </ul>
+
+        </div>
+    </footer>
+    {% endcache %}
+
+{% endblock %}
+

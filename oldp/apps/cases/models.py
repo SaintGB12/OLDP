@@ -1,0 +1,541 @@
+import datetime
+import html
+import json
+import logging
+
+from django.conf import settings
+from django.core import serializers
+from django.core.serializers.base import DeserializationError
+from django.db import models
+from django.urls import reverse
+from django.utils.html import strip_tags
+from django.utils.text import slugify
+
+# from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _
+
+from oldp.apps.annotations.content_models import AnnotationContent
+from oldp.apps.courts.models import Court
+from oldp.apps.lib.markers import insert_markers
+from oldp.apps.processing.errors import ProcessingError
+from oldp.apps.references.content_models import ReferenceContent
+from oldp.apps.search.models import RelatedContent, SearchableContent
+from oldp.apps.sources.models import SourceContent
+
+logger = logging.getLogger(__name__)
+
+
+class Case(
+    SourceContent, models.Model, SearchableContent, ReferenceContent, AnnotationContent
+):
+    """Model representing court cases (i.e. opinions, decisions, verdicts, ...)"""
+
+    title = models.CharField(
+        max_length=255,
+        default="",
+        blank=True,
+        help_text="Title (currently not used due to copyright issues)",
+    )
+    slug = models.SlugField(
+        max_length=200,
+        unique=True,
+        db_index=True,
+        help_text="Used to urls (consists of court, date, file number)",
+    )
+    court = models.ForeignKey(
+        Court,
+        default=Court.DEFAULT_ID,
+        help_text="Responsible court entity",
+        on_delete=models.SET_DEFAULT,
+    )
+    court_raw = models.CharField(
+        max_length=255,
+        default="{}",
+        help_text="Raw court information from crawler (JSON)",
+    )
+    # Denormalised from ``court`` so the list view can filter and sort in one
+    # table. Filtering on ``courts_court.jurisdiction`` while ordering by
+    # ``cases_case.date`` spans two tables, so MariaDB leads with the court
+    # index and then merges one sorted stream per matching court through a
+    # temp table + filesort: the prod slow log has that shape as the top
+    # user-facing query (66 calls, max 5.88s, 279k rows examined for a single
+    # 50-row page). No single-table index can fix a two-table shape, hence
+    # the copy. Kept in sync by ``Case.save()`` and a ``Court`` post_save.
+    court_jurisdiction = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Denormalised copy of court.jurisdiction (do not set directly)",
+    )
+    court_level_of_appeal = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Denormalised copy of court.level_of_appeal (do not set directly)",
+    )
+    court_chamber = models.CharField(
+        max_length=150, null=True, blank=True, help_text="Court chamber (e.g. 1. Senat)"
+    )
+    date = models.DateField(
+        null=True, db_index=True, help_text="Publication date as in source"
+    )
+    created_date = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Entry is created at this date time",
+        db_index=True,
+    )
+    updated_date = models.DateTimeField(
+        auto_now=True,
+        help_text="Date time of last change",
+        db_index=True,
+    )
+    file_number = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="File number as defined by court",
+    )
+    type = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Type of decision (Urteil, Beschluss, ...)",
+        db_index=True,
+    )
+    pdf_url = models.URLField(
+        # TODO Maybe we should store PDF files locally as well
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text="URL to original PDF file (not in use)",
+    )
+    references_extracted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Timestamp of the most recent run of the references "
+            "extract_refs processing step. Null when the step has "
+            "never run for this case — distinguishes 'extraction "
+            "found no refs' from 'extraction never ran' in the API/MCP."
+        ),
+    )
+    citing_cases_count = models.PositiveIntegerField(
+        default=0,
+        db_index=True,
+        help_text=(
+            "Denormalized number of distinct accepted cases that cite this "
+            "case (how often this decision is referenced). Recomputed off "
+            "the hot path by the ``update_citing_counts`` management command "
+            "and mirrored into Elasticsearch (``CaseIndex.citing_cases_count``) "
+            "to power most-cited / landmark-precedent sorting. Approximate "
+            "between recompute runs."
+        ),
+    )
+    review_status = models.CharField(
+        max_length=10,
+        choices=[
+            ("pending", "Pending"),
+            ("accepted", "Accepted"),
+            ("rejected", "Rejected"),
+        ],
+        default="accepted",
+        db_index=True,
+        help_text="Review status for case visibility",
+    )
+    raw = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Raw content (HTML) from crawler that can used to reconstruct all case information",
+        editable=False,
+    )
+    abstract = models.TextField(
+        null=True, blank=True, help_text="Case abstract (Leitsatz) formatted in HTML"
+    )
+    content = models.TextField(help_text="Case full-text formatted in Legal HTML")
+    ecli = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="ECLI",
+        help_text="European Case Law Identifier",
+    )
+    preceding_cases = models.ManyToManyField(
+        "self",
+        blank=True,
+        help_text="Cases from inferior courts (lower judicial authority)",
+    )
+    preceding_cases_raw = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Cases from inferior courts as in source HTML",
+    )
+    following_cases = models.ManyToManyField(
+        "self",
+        blank=True,
+        help_text="Cases from superior courts (higher judicial authority)",
+    )
+    following_cases_raw = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Cases from inferior courts as in source HTML",
+    )
+    created_by_token = models.ForeignKey(
+        "accounts.APIToken",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_cases",
+        help_text="API token used to create this case via the API",
+    )
+
+    # The following fields are excluded from the SELECT-query when querying the database
+    defer_fields_list_view = [
+        "court_raw",
+        "pdf_url",
+        "source_url",
+        "source_file",
+        "raw",
+        "content",
+        "preceding_cases",
+        "preceding_cases_raw",
+        "following_cases",
+        "following_cases_raw",
+        "court__description",
+        "court__homepage",
+        "court__image",
+        "court__street_address",
+        "court__postal_code",
+        "court__address_locality",
+        "court__telephone",
+        "court__fax_number",
+        "court__email",
+    ]
+
+    class Meta:
+        ordering = ("-date",)
+        unique_together = (("court", "file_number"),)
+        indexes = [
+            models.Index(fields=["ecli"], name="cases_case_ecli_idx"),
+            models.Index(fields=["file_number"], name="cases_case_file_number_idx"),
+            models.Index(fields=["court", "-date"], name="cases_case_court_date_idx"),
+            models.Index(
+                fields=["review_status", "court", "-date"],
+                name="cases_status_court_date_idx",
+            ),
+            models.Index(
+                fields=["review_status", "-updated_date"],
+                name="cases_status_updated_idx",
+            ),
+            # Ascending on ``date`` deliberately: the slowest logged instance
+            # of this shape sorts ASC (``?o=date`` in the list view), and
+            # MariaDB reads an index backwards at the same cost, so one
+            # ascending index serves both directions.
+            models.Index(
+                fields=["review_status", "court_jurisdiction", "date"],
+                name="cases_status_jur_date_idx",
+            ),
+            models.Index(
+                fields=["review_status", "court_level_of_appeal", "date"],
+                name="cases_status_loa_date_idx",
+            ),
+        ]
+        # TODO court, year, file_number should be better
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        # Snapshot the as-loaded ``content`` and ``references_extracted_at``
+        # so ``save()`` can detect a downstream mutation of ``content``
+        # and invalidate ``references_extracted_at`` when the caller
+        # didn't already refresh it. Marker offsets are anchored to
+        # whatever ``content`` was at extraction time; if a re-import or
+        # admin edit changes it without a fresh extraction, every stored
+        # ``CaseReferenceMarker`` silently drifts and the detail view
+        # renders broken anchors around random word fragments.
+        instance = super().from_db(db, field_names, values)
+        if "content" in field_names:
+            instance._content_at_load = instance.content
+        if "references_extracted_at" in field_names:
+            instance._references_extracted_at_at_load = instance.references_extracted_at
+        return instance
+
+    def sync_court_facets(self):
+        """Copy the court's facet columns onto this case.
+
+        Returns ``True`` when either value changed, so callers doing bulk
+        maintenance can skip writing rows that are already correct.
+        """
+        court = self.court
+        jurisdiction = court.jurisdiction if court else None
+        level_of_appeal = court.level_of_appeal if court else None
+        changed = (
+            self.court_jurisdiction != jurisdiction
+            or self.court_level_of_appeal != level_of_appeal
+        )
+        self.court_jurisdiction = jurisdiction
+        self.court_level_of_appeal = level_of_appeal
+        return changed
+
+    def save(self, *args, **kwargs):
+        loaded_content = getattr(self, "_content_at_load", None)
+        loaded_refs_at = getattr(self, "_references_extracted_at_at_load", None)
+        if (
+            self.pk is not None
+            and loaded_content is not None
+            and self.content != loaded_content
+            and self.references_extracted_at is not None
+            and self.references_extracted_at == loaded_refs_at
+        ):
+            # ``content`` changed but the caller didn't refresh
+            # ``references_extracted_at`` — markers are now stale.
+            # Cleared, not auto-re-extracted: extraction is too heavy
+            # to run inline on every save (model load is a ~200MB
+            # transformer for the default engine set). The standard
+            # ``process_cases`` batch filters on
+            # ``references_extracted_at IS NULL`` so the next run heals
+            # it; the defensive guard in ``insert_markers`` keeps the
+            # UI clean in the meantime.
+            self.references_extracted_at = None
+
+        # Refresh the denormalised court facets. ``court_id`` is always set
+        # (the FK defaults to Court.DEFAULT_ID), and reading ``self.court``
+        # costs one cached query at most.
+        self.sync_court_facets()
+
+        super().save(*args, **kwargs)
+        self._content_at_load = self.content
+        self._references_extracted_at_at_load = self.references_extracted_at
+
+    def is_private(self):
+        """Whether this item is not publicly visible (pending or rejected)."""
+        return self.review_status != "accepted"
+
+    def get_filename(self, ext="json"):
+        return "%s.%s" % (self.slug, ext)
+
+    def get_topics(self):
+        # TODO
+        return _("Unknown topic")
+
+    def get_court_raw(self):
+        """Court information from source"""
+        return json.loads(self.court_raw)
+
+    def get_type(self):
+        return self.__class__.__name__
+
+    def get_id(self):
+        return self.id
+
+    def get_content_as_html(self, request=None) -> str:
+        """Content is stored in HTML (no conversion needed)
+
+        :return: str
+        """
+        # TODO make line numbers clickable
+
+        content = self.content
+
+        if content is None or len(content) < 1:
+            logger.warning("Content is not set or empty")
+
+        markers = []
+
+        # TODO db should return markers already in order
+        markers += list(self.get_reference_markers())
+
+        # Generic markers
+        markers += list(self.get_markers(request))
+
+        content = insert_markers(content, markers)
+
+        return content
+
+    def get_text(self) -> str:
+        """Case content as plain text
+
+        :return: plain-text
+        """
+        return strip_tags(html.unescape(self.content))
+
+    def get_title(self) -> str:
+        try:
+            court_name = self.court.name
+
+            # Attach chamber if available
+            if self.court_chamber is not None and self.court_chamber != "":
+                court_name += " (" + self.court_chamber + ")"
+        except Court.DoesNotExist:
+            court_name = "(no court)"
+
+        return "%s vom %s - %s" % (self.get_case_type(), court_name, self.file_number)
+
+    def get_short_title(self, max_length=75) -> str:
+        title = self.get_title()
+        if len(title) > max_length:
+            return title[:max_length] + "..."
+        else:
+            return title
+
+    def get_case_type(self):
+        return self.type
+
+    def get_date(self, date_format="%Y-%m-%d"):
+        return self.date.strftime(date_format)
+
+    def get_related(self, n=5):
+        """Related items that are pre-computed with "generate_related_cases" command.
+
+        :param n: number of items
+        :return:
+        """
+        items = []
+        for item in (
+            RelatedCase.objects.filter(seed_content=self)
+            .select_related("related_content__court")
+            .order_by("-score")[:n]
+        ):
+            items.append(item.related_content)
+        return items
+
+    def get_short_url(self):
+        return settings.SITE_URL + reverse("cases_short_url", args=(self.pk,))
+
+    def get_absolute_url(self):
+        if self.slug is None or self.slug == "":  # TODO added view by id
+            self.slug = "no-slug"
+
+        return reverse("cases:case", args=(self.slug,))
+
+    def get_api_url(self):
+        return "/api/cases/{}/".format(self.pk)
+
+    def get_admin_url(self):
+        return reverse("admin:cases_case_change", args=(self.pk,))
+
+    def get_es_url(self):
+        return (
+            settings.ELASTICSEARCH_URL
+            + settings.ELASTICSEARCH_INDEX
+            + "/modelresult/cases.case.%s" % self.pk
+        )
+
+    def get_reference_marker_model(self):
+        from oldp.apps.references.models import CaseReferenceMarker
+
+        return CaseReferenceMarker
+
+    def set_slug(self):
+        # Transform date to string
+        if isinstance(self.date, datetime.date):
+            date_str = self.date.strftime("%Y-%m-%d")
+        else:
+            date_str = "%s" % self.date
+
+        # File numbers can be lists, so limit the length
+        max_fn_length = 20
+
+        self.slug = (
+            self.court.slug
+            + "-"
+            + date_str
+            + "-"
+            + slugify(self.file_number[:max_fn_length])
+        )
+
+    def set_ecli(self):
+        """Generate ECLI from court code and file number
+
+        See ECLI definition:
+
+        Consists of:
+        - ‘ECLI’: to identify the identifier as being a European Case Law Identifier;
+        - the country code;
+        - the code of the court that rendered the judgment;
+        - the year the judgment was rendered;
+        - an ordinal number, up to 25 alphanumeric characters, in a format that is decided upon by each Member State.
+            Dots are allowed, but not other punctuation marks.
+
+        """
+        self.ecli = (
+            "ECLI:de:"
+            + self.court.code
+            + ":"
+            + str(self.date.year)
+            + ":"
+            + slugify(self.file_number)
+        )
+
+    def get_annotation_model(self):
+        from oldp.apps.annotations.models import CaseAnnotation
+
+        return CaseAnnotation
+
+    def get_marker_model(self):
+        from oldp.apps.annotations.models import CaseMarker
+
+        return CaseMarker
+
+    def __str__(self):
+        return "<Case(#%i, court=%s, file_number=%s)>" % (
+            self.pk,
+            self.court.code,
+            self.file_number,
+        )
+
+    def to_json(self, file_path=None) -> str:
+        json_str = serializers.serialize("json", [self])
+
+        if file_path is not None:
+            with open(file_path, "w") as f:
+                f.write(json_str)
+
+        return json_str
+
+    @staticmethod
+    def from_json_file(file_path):
+        with open(file_path) as f:
+            # Django 5.2 made the JSON deserializer eager: json.loads now runs
+            # in Deserializer.__init__ instead of on first iteration, so an
+            # invalid payload raises DeserializationError from the
+            # `serializers.deserialize(...)` call itself, not from the loop
+            # below. Wrap the whole construct+iterate so both behaviours funnel
+            # into the ProcessingError below.
+            try:
+                for o in serializers.deserialize("json", f.read()):
+                    return o.object
+            except DeserializationError:
+                pass
+
+            raise ProcessingError("Cannot deserialize: %s" % file_path)
+
+        # MySQL utf8mb4 bugfix
+        # if instance.raw is not None:
+        #     instance.raw = ''.join([char if ord(char) < 128 else '' for char in instance.raw])
+        #
+        # if instance.text is not None:
+        #     instance.text = ''.join([char if ord(char) < 128 else '' for char in instance.text])
+        #
+        # return instance
+
+    @staticmethod
+    def get_queryset(request=None):
+        from oldp.api.mixins import filter_by_review_status
+
+        return filter_by_review_status(Case.objects.all(), request)
+
+
+class RelatedCase(RelatedContent):
+    seed_content = models.ForeignKey(
+        Case, related_name="seed_id", on_delete=models.CASCADE
+    )
+    related_content = models.ForeignKey(
+        Case, related_name="related_id", on_delete=models.CASCADE
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["seed_content", "-score"], name="cases_relcase_seed_score_idx"
+            ),
+        ]

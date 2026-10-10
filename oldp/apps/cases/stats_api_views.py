@@ -1,0 +1,595 @@
+"""API views for case statistics sub-endpoints.
+
+Each sub-endpoint returns the total count and results grouped by a dimension,
+where each result item includes its own total and date-bucketed time series.
+"""
+
+import datetime
+import logging
+from collections import defaultdict
+
+from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.db.models import Count
+from django.db.models.functions import TruncDay, TruncMonth, TruncYear
+from django.utils.decorators import method_decorator
+from django.views.decorators.vary import vary_on_headers
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.mixins import ListModelMixin
+from rest_framework.response import Response
+
+from oldp.api.cache import cache_page_for_anonymous
+from oldp.api.mixins import ReviewStatusFilterMixin
+from oldp.apps.accounts.permissions import HasTokenPermission
+from oldp.apps.cases.models import Case
+
+logger = logging.getLogger(__name__)
+
+
+class StatsBucketSerializer(serializers.Serializer):
+    """A single date-bucketed datapoint (e.g. ``{"date": "2026-01", "count": 5}``)."""
+
+    date = serializers.CharField()
+    count = serializers.IntegerField()
+
+
+class CaseStatsSerializer(serializers.Serializer):
+    """Documentation-only serializer for the stats endpoints.
+
+    ``CaseStatsViewSet`` builds plain dicts rather than serializing model
+    instances, so this serializer is never used to produce responses. It exists
+    solely so drf_yasg has something to introspect during schema generation
+    (a ``GenericViewSet`` without a ``serializer_class`` otherwise trips DRF's
+    ``serializer_class is not None`` assertion, which drf_yasg logs as a
+    warning and turns into an empty schema for every stats endpoint).
+    """
+
+    total = serializers.IntegerField()
+    buckets = StatsBucketSerializer(many=True)
+
+
+VALID_BUCKETS = ("year", "month", "day")
+VALID_REVIEW_STATUSES = ("pending", "accepted", "rejected")
+
+TRUNC_FUNCTIONS = {
+    "year": TruncYear,
+    "month": TruncMonth,
+    "day": TruncDay,
+}
+
+DATE_FORMATS = {
+    "year": "%Y",
+    "month": "%Y-%m",
+    "day": "%Y-%m-%d",
+}
+
+# Cap on the date range a caller may request for each bucket so the response
+# stays a reasonable size. Bucket=year has no cap (yearly counts compress
+# fine). When exceeded, _build_base_queryset returns a 400 with a message
+# naming the bucket and limit.
+BUCKET_RANGE_LIMITS = {
+    "day": relativedelta(months=3),
+    "month": relativedelta(years=5),
+}
+BUCKET_RANGE_DESCRIPTIONS = {
+    "day": "3 months",
+    "month": "5 years",
+}
+
+BASE_PARAMETERS = [
+    openapi.Parameter(
+        "date_after",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        format="date",
+        description="Filter cases with date >= this value (YYYY-MM-DD). Default: one year ago.",
+    ),
+    openapi.Parameter(
+        "date_before",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        format="date",
+        description="Filter cases with date <= this value (YYYY-MM-DD). Default: today.",
+    ),
+    openapi.Parameter(
+        "bucket",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        enum=list(VALID_BUCKETS),
+        description="Time bucket for date grouping. Default: month.",
+    ),
+    openapi.Parameter(
+        "review_status",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        enum=list(VALID_REVIEW_STATUSES),
+        description="Filter by review status (staff only).",
+    ),
+]
+
+STATS_PARAMETERS = BASE_PARAMETERS + [
+    openapi.Parameter(
+        "court",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_INTEGER,
+        description="Filter by court ID.",
+    ),
+    openapi.Parameter(
+        "court_slug",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        description="Filter by court slug.",
+    ),
+    openapi.Parameter(
+        "court__state",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_INTEGER,
+        description="Filter by state ID (via court relation).",
+    ),
+    openapi.Parameter(
+        "state_slug",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        description="Filter by state slug (via court relation).",
+    ),
+    openapi.Parameter(
+        "source",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_INTEGER,
+        description="Filter by source ID.",
+    ),
+]
+
+BY_COURT_PARAMETERS = BASE_PARAMETERS + [
+    openapi.Parameter(
+        "court__state",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_INTEGER,
+        description="Filter by state ID (required unless state_slug is provided).",
+    ),
+    openapi.Parameter(
+        "state_slug",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        description="Filter by state slug (alternative to court__state).",
+    ),
+    openapi.Parameter(
+        "source",
+        openapi.IN_QUERY,
+        type=openapi.TYPE_INTEGER,
+        description="Filter by source ID.",
+    ),
+]
+
+
+def _parse_int_param(value, param_name):
+    """Parse a query parameter as an integer.
+
+    Returns:
+        (int_value, error_message) — int_value is None if not provided,
+        error_message is a string if validation failed.
+    """
+    if not value:
+        return None, None
+    try:
+        return int(value), None
+    except (ValueError, TypeError):
+        return (
+            None,
+            f"Invalid value '{value}' for '{param_name}'. Expected a numeric ID.",
+        )
+
+
+class CaseStatsViewSet(
+    ReviewStatusFilterMixin, viewsets.GenericViewSet, ListModelMixin
+):
+    """Case statistics grouped by various dimensions.
+
+    Endpoints:
+    - /api/cases/stats/ — total count and date-bucketed time series
+    - /api/cases/stats/by_country/
+    - /api/cases/stats/by_state/
+    - /api/cases/stats/by_court/ (requires court__state filter)
+    - /api/cases/stats/by_source/
+
+    The root endpoint only supports date range and review_status filters.
+    Sub-endpoints additionally support court, state, and source filters.
+
+    Each result item includes its own total and date-bucketed time series.
+
+    Defaults to the last year with monthly buckets.
+    Staff users can additionally filter by review_status.
+    Non-staff users only see statistics for accepted cases.
+    """
+
+    permission_classes = [HasTokenPermission]
+    token_resource = "cases"
+    http_method_names = ["get", "head", "options"]
+    queryset = Case.objects.all()
+    # Documentation-only: the actions build plain dicts and never call
+    # get_serializer() at runtime. This serializer exists so drf_yasg can
+    # introspect the view during schema generation instead of raising
+    # (see CaseStatsSerializer / get_serializer_class).
+    serializer_class = CaseStatsSerializer
+
+    def get_serializer_class(self):
+        """Return the stub serializer used for schema generation.
+
+        drf_yasg calls ``get_serializer()`` while introspecting the view; a
+        ``GenericViewSet`` with no ``serializer_class`` would raise there. We
+        short-circuit explicitly on ``swagger_fake_view`` for clarity, and fall
+        back to ``CaseStatsSerializer`` otherwise.
+        """
+        if getattr(self, "swagger_fake_view", False):
+            return CaseStatsSerializer
+        return super().get_serializer_class()
+
+    @method_decorator(cache_page_for_anonymous(settings.CACHE_TTL_STATS))
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language", "Host"))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def _parse_date(self, value, param_name):
+        """Parse an ISO date string, returning None if not provided."""
+        if not value:
+            return None
+        try:
+            return datetime.date.fromisoformat(value)
+        except ValueError:
+            return ValueError(
+                f"Invalid date format for '{param_name}': '{value}'. Use YYYY-MM-DD."
+            )
+
+    def _build_base_queryset(self, request):
+        """Build queryset with date range and review_status filters only.
+
+        Returns (queryset, filters_dict, error_response) where error_response
+        is a Response if validation failed, or None on success.
+        """
+        params = request.query_params
+
+        # Parse and validate bucket
+        bucket = params.get("bucket", "month")
+        if bucket not in VALID_BUCKETS:
+            return (
+                None,
+                None,
+                Response(
+                    {
+                        "detail": f"Invalid bucket '{bucket}'. Must be one of: {', '.join(VALID_BUCKETS)}."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
+            )
+
+        # Parse dates with defaults: last year
+        today = datetime.date.today()
+        one_year_ago = today - relativedelta(years=1)
+
+        date_after = self._parse_date(params.get("date_after"), "date_after")
+        if isinstance(date_after, ValueError):
+            return (
+                None,
+                None,
+                Response(
+                    {"detail": str(date_after)}, status=status.HTTP_400_BAD_REQUEST
+                ),
+            )
+        if date_after is None:
+            date_after = one_year_ago
+
+        date_before = self._parse_date(params.get("date_before"), "date_before")
+        if isinstance(date_before, ValueError):
+            return (
+                None,
+                None,
+                Response(
+                    {"detail": str(date_before)}, status=status.HTTP_400_BAD_REQUEST
+                ),
+            )
+        if date_before is None:
+            date_before = today
+
+        # Per-bucket range cap. A "day" bucket over five years would emit
+        # ~1800 datapoints per result item; cap fine-grained buckets to keep
+        # responses bounded. bucket="year" is unrestricted.
+        max_span = BUCKET_RANGE_LIMITS.get(bucket)
+        if max_span is not None and date_after + max_span < date_before:
+            return (
+                None,
+                None,
+                Response(
+                    {
+                        "detail": (
+                            f"Date range too large for bucket='{bucket}'. "
+                            f"Maximum span is {BUCKET_RANGE_DESCRIPTIONS[bucket]}. "
+                            f"Narrow the date range or pick a coarser bucket."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
+            )
+
+        # Build queryset (ReviewStatusFilterMixin handles visibility)
+        qs = self.get_queryset()
+
+        # Apply date filters
+        qs = qs.filter(date__gte=date_after, date__lte=date_before)
+
+        # Staff-only review_status filter
+        review_status = params.get("review_status")
+        if review_status and request.user.is_authenticated and request.user.is_staff:
+            qs = qs.filter(review_status=review_status)
+
+        filters_dict = {
+            "date_after": str(date_after),
+            "date_before": str(date_before),
+            "bucket": bucket,
+        }
+
+        return qs, filters_dict, None
+
+    def _build_filtered_queryset(self, request):
+        """Build queryset with all filters (date, review_status, court, state, source).
+
+        Extends _build_base_queryset with dimension-specific filters for sub-endpoints.
+        """
+        qs, filters_dict, error = self._build_base_queryset(request)
+        if error:
+            return None, None, error
+
+        params = request.query_params
+
+        # Court filter: by ID or by slug
+        court_id, err = _parse_int_param(params.get("court"), "court")
+        if err:
+            return (
+                None,
+                None,
+                Response({"detail": err}, status=status.HTTP_400_BAD_REQUEST),
+            )
+        if court_id:
+            qs = qs.filter(court_id=court_id)
+
+        court_slug = params.get("court_slug")
+        if court_slug:
+            qs = qs.filter(court__slug=court_slug)
+
+        # State filter: by ID or by slug
+        state_id, err = _parse_int_param(params.get("court__state"), "court__state")
+        if err:
+            return (
+                None,
+                None,
+                Response({"detail": err}, status=status.HTTP_400_BAD_REQUEST),
+            )
+        if state_id:
+            qs = qs.filter(court__state_id=state_id)
+
+        state_slug = params.get("state_slug")
+        if state_slug:
+            qs = qs.filter(court__state__slug=state_slug)
+
+        # Source filter: by ID only (Source has no slug)
+        source_id, err = _parse_int_param(params.get("source"), "source")
+        if err:
+            return (
+                None,
+                None,
+                Response({"detail": err}, status=status.HTTP_400_BAD_REQUEST),
+            )
+        if source_id:
+            qs = qs.filter(source_id=source_id)
+
+        return qs, filters_dict, None
+
+    def _build_buckets(self, qs, bucket):
+        """Build time-series buckets from queryset."""
+        trunc_fn = TRUNC_FUNCTIONS[bucket]
+        date_format = DATE_FORMATS[bucket]
+        by_date_qs = (
+            qs.filter(date__isnull=False)
+            .annotate(period=trunc_fn("date"))
+            .values("period")
+            .annotate(count=Count("id"))
+            .order_by("period")
+        )
+        return [
+            {"date": item["period"].strftime(date_format), "count": item["count"]}
+            for item in by_date_qs
+        ]
+
+    def _build_grouped_results(self, qs, bucket, group_fields, item_builder):
+        """Build results where each item has its own total and date buckets.
+
+        Args:
+            qs: Filtered queryset.
+            bucket: Time bucket name (year/month/day).
+            group_fields: List of field paths to group by (e.g. ["court__id", "court__name"]).
+            item_builder: Callable(row_dict) -> dict with item metadata (id, name, etc.).
+                          Called once per unique group to build the base item dict.
+        """
+        trunc_fn = TRUNC_FUNCTIONS[bucket]
+        date_format = DATE_FORMATS[bucket]
+        id_field = group_fields[0]
+
+        # Single query: group by dimension fields + date bucket
+        rows = (
+            qs.filter(date__isnull=False)
+            .annotate(period=trunc_fn("date"))
+            .values(*group_fields, "period")
+            .annotate(count=Count("id"))
+            .order_by(id_field, "period")
+        )
+
+        # Collect per-item buckets and totals
+        items = {}
+        totals = defaultdict(int)
+        for row in rows:
+            item_id = row[id_field]
+            if item_id not in items:
+                items[item_id] = {
+                    "meta": item_builder(row),
+                    "buckets": [],
+                }
+            items[item_id]["buckets"].append(
+                {"date": row["period"].strftime(date_format), "count": row["count"]}
+            )
+            totals[item_id] += row["count"]
+
+        # Build final results sorted by total descending
+        results = []
+        for item_id in sorted(totals, key=totals.get, reverse=True):
+            entry = items[item_id]["meta"]
+            entry["total"] = totals[item_id]
+            entry["buckets"] = items[item_id]["buckets"]
+            results.append(entry)
+
+        return results
+
+    def _build_response(self, request, group_fields, item_builder):
+        """Build a stats response with total and per-item bucketed results."""
+        qs, filters_dict, error = self._build_filtered_queryset(request)
+        if error:
+            return error
+
+        total = qs.count()
+        results = self._build_grouped_results(
+            qs, filters_dict["bucket"], group_fields, item_builder
+        )
+
+        return Response(
+            {
+                "filters": filters_dict,
+                "total": total,
+                "results": results,
+            }
+        )
+
+    @swagger_auto_schema(
+        operation_description=(
+            "Overall case statistics: total count and date-bucketed time series. "
+            "Only date range and review_status filters are supported."
+        ),
+        manual_parameters=BASE_PARAMETERS,
+    )
+    def list(self, request, *args, **kwargs):
+        """Return overall case statistics with total and date buckets."""
+        qs, filters_dict, error = self._build_base_queryset(request)
+        if error:
+            return error
+
+        total = qs.count()
+        buckets = self._build_buckets(qs, filters_dict["bucket"])
+
+        return Response(
+            {
+                "filters": filters_dict,
+                "total": total,
+                "buckets": buckets,
+            }
+        )
+
+    @swagger_auto_schema(
+        operation_description=(
+            "Case counts grouped by country. Each country includes "
+            "its own total and date-bucketed time series."
+        ),
+        manual_parameters=STATS_PARAMETERS,
+    )
+    @action(detail=False, url_path="by_country", url_name="by-country")
+    def by_country(self, request):
+        """Return case statistics grouped by country."""
+        return self._build_response(
+            request,
+            group_fields=[
+                "court__state__country__id",
+                "court__state__country__code",
+                "court__state__country__name",
+            ],
+            item_builder=lambda r: {
+                "id": r["court__state__country__id"],
+                "code": r["court__state__country__code"],
+                "name": r["court__state__country__name"],
+            },
+        )
+
+    @swagger_auto_schema(
+        operation_description=(
+            "Case counts grouped by state. Each state includes "
+            "its own total and date-bucketed time series."
+        ),
+        manual_parameters=STATS_PARAMETERS,
+    )
+    @action(detail=False, url_path="by_state", url_name="by-state")
+    def by_state(self, request):
+        """Return case statistics grouped by state."""
+        return self._build_response(
+            request,
+            group_fields=["court__state__id", "court__state__name"],
+            item_builder=lambda r: {
+                "id": r["court__state__id"],
+                "name": r["court__state__name"],
+            },
+        )
+
+    @swagger_auto_schema(
+        operation_description=(
+            "Case counts grouped by court. Each court includes "
+            "its own total and date-bucketed time series. "
+            "Requires the court__state filter."
+        ),
+        manual_parameters=BY_COURT_PARAMETERS,
+    )
+    @action(detail=False, url_path="by_court", url_name="by-court")
+    def by_court(self, request):
+        """Return case statistics grouped by court. Requires court__state or state_slug filter."""
+        if not request.query_params.get(
+            "court__state"
+        ) and not request.query_params.get("state_slug"):
+            return Response(
+                {
+                    "detail": "The 'court__state' or 'state_slug' filter is required for this endpoint."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return self._build_response(
+            request,
+            group_fields=["court__id", "court__name"],
+            item_builder=lambda r: {
+                "id": r["court__id"],
+                "name": r["court__name"],
+            },
+        )
+
+    @swagger_auto_schema(
+        operation_description=(
+            "Case counts grouped by source. Each source includes "
+            "its own total and date-bucketed time series. "
+            "Restricted to staff users."
+        ),
+        manual_parameters=STATS_PARAMETERS,
+    )
+    @action(detail=False, url_path="by_source", url_name="by-source")
+    def by_source(self, request):
+        """Return case statistics grouped by source. Staff-only."""
+        # The data source for a case is internal book-keeping (not
+        # published), so this dimension is restricted to staff/admin
+        # in both the API and the frontend (see StatsBySourceView).
+        if not (request.user.is_authenticated and request.user.is_staff):
+            return Response(
+                {"detail": "Staff-only endpoint."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return self._build_response(
+            request,
+            group_fields=["source__id", "source__name"],
+            item_builder=lambda r: {
+                "id": r["source__id"],
+                "name": r["source__name"],
+            },
+        )

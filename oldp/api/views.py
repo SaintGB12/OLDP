@@ -1,0 +1,178 @@
+from django.conf import settings
+from django.utils.decorators import method_decorator
+from django.views.decorators.vary import vary_on_headers
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, viewsets
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.filters import SearchFilter
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from oldp.api.cache import cache_page_for_anonymous
+from oldp.api.mixins import ReviewStatusFilterMixin
+from oldp.apps.accounts.permissions import HasTokenPermission
+from oldp.apps.courts.filters import CourtAPIFilter
+from oldp.apps.courts.models import City, Country, Court, State
+from oldp.apps.courts.serializers import (
+    CitySerializer,
+    CountrySerializer,
+    CourtCreateSerializer,
+    CourtSerializer,
+    StateSerializer,
+)
+from oldp.apps.courts.services import CourtCreator
+
+
+class CourtViewSet(ReviewStatusFilterMixin, viewsets.ModelViewSet):
+    """ViewSet for courts.
+
+    Lists, retrieves, creates, and updates courts. Supports full-text search
+    on `name`, `aliases`, and `code` via the `search` query parameter.
+    Filter by state, jurisdiction, level of appeal, and more.
+    Write operations require authentication; new courts are set to pending review.
+    """
+
+    permission_classes = [HasTokenPermission]
+    token_resource = "courts"
+
+    queryset = Court.objects.all().order_by("name")
+    serializer_class = CourtSerializer
+
+    filter_backends = (DjangoFilterBackend, SearchFilter)
+    filterset_class = CourtAPIFilter
+    search_fields = ("name", "aliases", "code")
+
+    @method_decorator(cache_page_for_anonymous(settings.CACHE_TTL))
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language", "Host"))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get_permissions(self):
+        """Return permissions based on action - require auth for write operations."""
+        action = getattr(self, "action", None)
+        if action in ["create", "update", "partial_update", "destroy"]:
+            return [IsAuthenticated(), HasTokenPermission()]
+        return [HasTokenPermission()]
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if getattr(self, "action", None) == "create":
+            return CourtCreateSerializer
+        return CourtSerializer
+
+    def update(self, request, *args, **kwargs):
+        """Update a court. Requires staff (moderation action). Mirrors CaseViewSet."""
+        if not request.user.is_staff:
+            raise PermissionDenied("Only staff users can update courts.")
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """Partially update a court. Requires staff (moderation action)."""
+        if not request.user.is_staff:
+            raise PermissionDenied("Only staff users can update courts.")
+        return super().partial_update(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("created_by_token")
+
+    def create(self, request, *args, **kwargs):
+        """Create a new court.
+
+        The state is resolved from state_name and city from city_name.
+        Courts created via API are set to review_status='pending'.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+
+        # Get the API token from request
+        api_token = getattr(request, "auth", None)
+
+        # Create the court
+        creator = CourtCreator()
+        court = creator.create_court(
+            name=data["name"],
+            code=data["code"],
+            state_name=data["state_name"],
+            court_type=data.get("court_type"),
+            city_name=data.get("city_name"),
+            jurisdiction=data.get("jurisdiction"),
+            level_of_appeal=data.get("level_of_appeal"),
+            aliases=data.get("aliases"),
+            description=data.get("description"),
+            homepage=data.get("homepage"),
+            street_address=data.get("street_address"),
+            postal_code=data.get("postal_code"),
+            address_locality=data.get("address_locality"),
+            telephone=data.get("telephone"),
+            fax_number=data.get("fax_number"),
+            email=data.get("email"),
+            api_token=api_token,
+        )
+
+        # Return minimal response
+        response_data = {
+            "id": court.id,
+            "slug": court.slug,
+            "review_status": court.review_status,
+        }
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class CityViewSet(viewsets.ModelViewSet):
+    """Cities (read-only).
+
+    Filter by `state_id` or `state__slug`.
+    """
+
+    queryset = City.objects.all().order_by("name")
+    serializer_class = CitySerializer
+
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ("state_id", "state__slug")
+    http_method_names = ["get", "head", "options"]
+
+    @method_decorator(cache_page_for_anonymous(settings.CACHE_TTL))
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language", "Host"))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+
+class StateViewSet(viewsets.ModelViewSet):
+    """States / federal states (read-only).
+
+    Filter by `country_id`.
+    """
+
+    queryset = State.objects.all().order_by("name")
+    serializer_class = StateSerializer
+
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ("country_id",)
+    http_method_names = ["get", "head", "options"]
+
+    @method_decorator(cache_page_for_anonymous(settings.CACHE_TTL))
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language", "Host"))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+
+class CountryViewSet(viewsets.ModelViewSet):
+    """Countries (read-only).
+
+    Filter by `code`.
+    """
+
+    queryset = Country.objects.all().order_by("name")
+    serializer_class = CountrySerializer
+
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ("code",)
+    http_method_names = ["get", "head", "options"]
+
+    @method_decorator(cache_page_for_anonymous(settings.CACHE_TTL))
+    @method_decorator(vary_on_headers("Authorization", "Accept-Language", "Host"))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)

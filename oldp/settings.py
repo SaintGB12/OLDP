@@ -1,0 +1,1111 @@
+"""Django settings for OLDP (using django-configurations)"""
+
+import os
+from pathlib import Path
+
+from configurations import Configuration, values
+from configurations.values import Value, setup_value
+from django.contrib.messages import constants as message_constants
+from django.utils.translation import gettext_lazy as _
+
+from oldp.apps.courts.apps import CourtTypesDefault
+
+# DE-specific search synonym vocabulary is NOT hard-coded here (oldp is the
+# generic platform). It is loaded at settings time from the file named by
+# the OLDP_SEARCH_SYNONYMS_FILE env var (the OLDP-DE deployment ships
+# dev-deployment/de_search_synonyms.txt and points the var at it). Without
+# the file, oldp runs the German analyzers with no synonym filters. See
+# oldp/apps/search/analysis.py.
+from oldp.apps.search.analysis import (  # noqa: E402
+    add_arabic_analyzers,
+    build_german_index_settings,
+    load_law_synonyms,
+    load_search_synonyms,
+)
+
+LEGAL_SYNONYMS, CONCEPT_SYNONYMS = load_search_synonyms(
+    os.environ.get("OLDP_SEARCH_SYNONYMS_FILE", "")
+)
+
+# Law full-name → code rules (directional, query-time graph; same bucket as
+# the concept synonyms). Generated offline from LawBook via
+# ``manage.py generate_law_synonyms`` and pointed at by OLDP_LAW_SYNONYMS_FILE;
+# without the file the analyzer simply ships no law-abbreviation expansion.
+LAW_SYNONYMS = load_law_synonyms(os.environ.get("OLDP_LAW_SYNONYMS_FILE", ""))
+
+
+class BaseConfiguration(Configuration):
+    """Base configuration, all deployment configs (dev, prod, test, ...) inherits from this class."""
+
+    DEBUG = False
+
+    # Default primary key field type
+    # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
+
+    DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+    # Make this unique, and don't share it with anybody.
+    SECRET_KEY = "something_secret"
+
+    SITE_NAME = values.Value("OLDP")
+    SITE_EMAIL = values.Value("hello@openlegaldata.io")
+    SITE_URL = values.Value("http://localhost:8000")
+    SITE_TITLE = values.Value("Open Legal Data")
+    SITE_ICON = values.Value("fa-balance-scale")
+    SITE_TWITTER_URL = values.Value("https://twitter.com/openlegaldata")
+    SITE_GITHUB_URL = values.Value("https://github.com/openlegaldata")
+    SITE_LINKEDIN_URL = values.Value(
+        "https://www.linkedin.com/company/open-legal-data/"
+    )
+    SITE_DISCORD_URL = values.Value("#discord")
+
+    SITE_BLOG_URL = values.Value("//openlegaldata.io/blog")
+    SITE_API_DOCS_URL = values.Value("https://openlegaldata.github.io/oldp/")
+    # Version-less deep link: gh-pages serves a root ``mcp.html`` (see
+    # ``docs/templates/mcp.html``) that redirects to the newest release's MCP
+    # page, so this never needs bumping per release.
+    SITE_MCP_DOCS_URL = values.Value("https://openlegaldata.github.io/oldp/mcp.html")
+
+    # Matomo analytics (self-hosted, cookieless). The tracking snippet renders
+    # only when BOTH values are set, so it stays inert in dev/test by default.
+    # ``MATOMO_URL`` is the Matomo base URL including trailing slash (it serves
+    # ``matomo.php`` and ``matomo.js``); ``MATOMO_SITE_ID`` is the integer site
+    # id from Matomo. Env: DJANGO_MATOMO_URL / DJANGO_MATOMO_SITE_ID.
+    MATOMO_URL = values.Value("")
+    MATOMO_SITE_ID = values.Value("")
+
+    SITE_ID = 1
+
+    INTERNAL_IPS = values.TupleValue(("127.0.0.1",))
+
+    ALLOWED_HOSTS = values.ListValue(["127.0.0.1", "localhost"])
+
+    CSRF_TRUSTED_ORIGINS = values.ListValue([])
+
+    # Slugs of LawBooks shown as "top books" on /law/ in the order listed.
+    # Empty/unset hides the top block. Read from env var DJANGO_TOP_LAW_BOOKS
+    # as a comma-separated string (e.g. "gg,bgb,stgb,hgb,estg").
+    TOP_LAW_BOOKS = values.ListValue([])
+
+    # Example search queries shown on the homepage search box. Read from env
+    # var DJANGO_SEARCH_EXAMPLE_QUERIES as a comma-separated string (e.g.
+    # "Maklervertrag,Treu und Glauben,bgb 144"). Each entry is rendered as a
+    # live search link via the ``search_example_queries`` template tag. Empty/
+    # unset falls back to the translated ``search_example_queryN`` strings.
+    # Configurable per deployment so the examples (and their working syntax —
+    # boolean ``OR`` is no longer a query operator) can change without a code
+    # or translation edit. A query containing a comma is not supported (comma
+    # is the separator).
+    SEARCH_EXAMPLE_QUERIES = values.ListValue([])
+
+    # Application definition
+    INSTALLED_APPS = [
+        # local apps
+        "oldp.apps.accounts.apps.AccountsConfig",
+        "oldp.apps.laws.apps.LawsConfig",
+        "oldp.apps.homepage.apps.HomepageConfig",
+        "oldp.apps.cases.apps.CasesConfig",
+        "oldp.apps.topics.apps.TopicsConfig",
+        "oldp.apps.processing.apps.ProcessingConfig",
+        "oldp.apps.search.apps.SearchConfig",
+        "oldp.apps.courts.apps.CourtsConfig",
+        "oldp.apps.references.apps.ReferencesConfig",
+        "oldp.apps.contact.apps.ContactConfig",
+        "oldp.apps.annotations.apps.AnnotationsConfig",
+        "oldp.apps.sources.apps.SourcesConfig",
+        "oldp.apps.pages.apps.PagesConfig",
+        "oldp.apps.lib.apps.LibConfig",
+        # third party apps
+        # 'pipeline',  # build sass
+        "compressor",
+        "dal",
+        "dal_select2",
+        "haystack",
+        # 'ckeditor',  # disable due to unfixed security issue
+        "drf_yasg",
+        "rest_framework",
+        "rest_framework.authtoken",
+        "django_filters",
+        # 'envelope',  # contact form
+        # 'tellme',  # feedback
+        "widget_tweaks",  # forms
+        "crispy_forms",
+        "crispy_bootstrap4",
+        "mathfilters",  # math filters for templates
+        # 'bootstrapform',
+        "allauth",
+        "allauth.account",
+        "allauth.socialaccount",
+        "allauth.socialaccount.providers.google",
+        "allauth.socialaccount.providers.github",
+        # 'allauth.socialaccount.providers.twitter',
+        # MCP + OAuth
+        "oauth2_provider",
+        "mcp_server",
+        "oldp.apps.mcp.apps.MCPConfig",
+        # django internal
+        "django.contrib.admin",
+        "django.contrib.auth",
+        "django.contrib.sites",
+        "django.contrib.contenttypes",
+        "django.contrib.sessions",
+        "django.contrib.messages",
+        "django.contrib.humanize",
+        "django.contrib.staticfiles",
+        "django.contrib.flatpages",
+        "django.contrib.sitemaps",
+    ]
+
+    CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
+
+    CRISPY_TEMPLATE_PACK = "bootstrap4"
+
+    # ############## PATHS ###############
+
+    BASE_DIR = Path(os.path.abspath(__file__)).parent.parent
+
+    PACKAGE_DIR = BASE_DIR / "oldp"
+    APPS_DIR = PACKAGE_DIR / "apps"
+    ASSETS_DIR = PACKAGE_DIR / "assets"
+    WORKING_DIR = BASE_DIR / "workingdir"
+
+    # Directory of markdown files served as static pages at /pages/<slug>/ by
+    # oldp.apps.pages. Themes override the default (e.g. oldp-de points it at the
+    # German Impressum/Datenschutz/AGB); deployments can override either via the
+    # DJANGO_MARKDOWN_PAGES_DIR env var to keep the texts in a private repo and
+    # mount them into the container — no code/theme release needed to edit them.
+    MARKDOWN_PAGES_DIR = values.Value(str(APPS_DIR / "pages" / "content"))
+
+    # Email settings
+    # Prod points these at the all-inkl (KAS) SMTP relay via DJANGO_EMAIL_*
+    # env vars (see deployment/oldp-de-prod.env): authenticated, STARTTLS on
+    # 587, DKIM-signed. The defaults below keep local dev on localhost:25.
+    DEFAULT_FROM_EMAIL = values.Value("no-reply@openlegaldata.io")
+    # Address Django uses as the sender for error/admin mail. Defaults to
+    # root@localhost otherwise, which the relay rejects.
+    SERVER_EMAIL = values.Value("no-reply@openlegaldata.io")
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = values.Value("localhost")
+    EMAIL_PORT = values.IntegerValue(25)
+    EMAIL_USE_TLS = values.BooleanValue(False)
+    # 465-SSL fallback, env-selectable without a code change. Mutually
+    # exclusive with EMAIL_USE_TLS (Django asserts this).
+    EMAIL_USE_SSL = values.BooleanValue(False)
+    EMAIL_HOST_USER = values.Value("")
+    EMAIL_HOST_PASSWORD = values.Value("")
+    # Cap how long a send may block a gunicorn worker if the relay is slow or
+    # unreachable, so mail problems degrade gracefully instead of hanging.
+    EMAIL_TIMEOUT = values.IntegerValue(10)
+
+    # Rotating-file log retention. Defaults give ~150 MB total
+    # (15 MB × 10 backups), which under heavy bot traffic is only a few
+    # hours of history. Raise via env var in production to keep enough
+    # history for incident analysis. Applied to LOGGING in
+    # ``_apply_dynamic_settings`` below.
+    LOG_MAX_BYTES = values.IntegerValue(1024 * 1024 * 15)
+    LOG_BACKUP_COUNT = values.IntegerValue(10)
+
+    # AnonymousPublicCacheMiddleware — see oldp/utils/middleware.py.
+    # Makes anonymous GETs on public paths CDN-cacheable by stripping
+    # Vary: Cookie and Set-Cookie and emitting Cache-Control: public.
+    ANON_CACHE_ENABLED = values.BooleanValue(True)
+    ANON_CACHE_PATH_PREFIXES = values.ListValue(
+        ["/case/", "/law/", "/court/", "/pages/", "/search/"]
+    )
+    ANON_CACHE_PATHS_EXACT = values.ListValue(["/"])
+    ANON_CACHE_S_MAXAGE = values.IntegerValue(600)
+    ANON_CACHE_MAX_AGE = values.IntegerValue(60)
+
+    MIDDLEWARE = [
+        # Runs last on the response phase (it's first in the list), so it
+        # sees the final Vary/Set-Cookie set by Django and can normalize
+        # them for CDN-friendly caching of anonymous responses.
+        "oldp.utils.middleware.AnonymousPublicCacheMiddleware",
+        "django.middleware.gzip.GZipMiddleware",
+        "django.middleware.http.ConditionalGetMiddleware",
+        # Simplified static file serving.
+        # https://warehouse.python.org/project/whitenoise/
+        "whitenoise.middleware.WhiteNoiseMiddleware",
+        "django.middleware.security.SecurityMiddleware",
+        "django.contrib.sessions.middleware.SessionMiddleware",
+        "django.middleware.locale.LocaleMiddleware",
+        "oldp.apps.lib.apps.DomainLocaleMiddleware",
+        "django.middleware.common.CommonMiddleware",
+        "django.middleware.csrf.CsrfViewMiddleware",
+        "django.contrib.auth.middleware.AuthenticationMiddleware",
+        "django.contrib.messages.middleware.MessageMiddleware",
+        "django.middleware.clickjacking.XFrameOptionsMiddleware",
+        "django.contrib.flatpages.middleware.FlatpageFallbackMiddleware",
+        # 'pipeline.middleware.MinifyHTMLMiddleware',
+        "allauth.account.middleware.AccountMiddleware",
+    ]
+
+    ROOT_URLCONF = "oldp.urls"
+
+    TEMPLATES = [
+        {
+            "BACKEND": "django.template.backends.django.DjangoTemplates",
+            "DIRS": [PACKAGE_DIR / "assets/templates"],
+            "APP_DIRS": True,
+            "OPTIONS": {
+                "context_processors": [
+                    "django.template.context_processors.debug",
+                    "django.template.context_processors.request",
+                    "django.contrib.auth.context_processors.auth",
+                    "django.contrib.messages.context_processors.messages",
+                    "oldp.apps.lib.context_processors.global_context_processor",
+                ],
+            },
+        },
+    ]
+
+    WSGI_APPLICATION = "oldp.wsgi.application"
+
+    # Messages
+
+    MESSAGE_LEVEL = message_constants.DEBUG
+    MESSAGE_TAGS = {
+        message_constants.DEBUG: "alert-info",
+        message_constants.INFO: "alert-info",
+        message_constants.SUCCESS: "alert-success",
+        message_constants.WARNING: "alert-warning",
+        message_constants.ERROR: "alert-danger",
+    }
+
+    # Password validation
+    # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
+
+    AUTH_PASSWORD_VALIDATORS = [
+        {
+            "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        },
+        {
+            "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        },
+        {
+            "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+        },
+        {
+            "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        },
+    ]
+
+    AUTHENTICATION_BACKENDS = (
+        # Needed to login by username in Django admin, regardless of `allauth`
+        "django.contrib.auth.backends.ModelBackend",
+        # `allauth` specific authentication methods, such as login by e-mail
+        "allauth.account.auth_backends.AuthenticationBackend",
+        # OAuth2 for MCP connector authentication
+        "oauth2_provider.backends.OAuth2Backend",
+    )
+
+    LOGIN_REDIRECT_URL = "/accounts/email/"
+    # ACCOUNT_EMAIL_REQUIRED = True
+    ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+    ACCOUNT_USERNAME_BLACKLIST = ["admin", "oldp", "openlegaldata"]
+    ACCOUNT_USERNAME_MIN_LENGTH = 3
+
+    ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
+
+    # Extra (all-optional) signup fields: role / organization / use-case +
+    # newsletter opt-in. allauth mixes this into both local and social signup
+    # forms and calls its ``signup(request, user)`` hook to persist the profile.
+    ACCOUNT_SIGNUP_FORM_CLASS = "oldp.apps.accounts.forms.CustomSignupForm"
+
+    # Custom adapter for graceful email error handling
+    ACCOUNT_ADAPTER = "oldp.apps.accounts.adapters.CustomAccountAdapter"
+
+    # Default cap on application API tokens per user. Admins can override per
+    # user via UserProfile.max_api_tokens. (Rate limiting is per-user, so this
+    # is hygiene/blast-radius control, not a rate-limit lever.)
+    API_TOKENS_PER_USER_DEFAULT = values.IntegerValue(5)
+
+    # ###### Inactive-account lifecycle (manual cleanup commands) ######
+    # Powers ``manage.py warn_inactive_users`` + ``purge_inactive_users``.
+    # These are NEVER run automatically — an operator runs them manually (see
+    # the deployment README). The flow is: dormant -> warning email -> (grace)
+    # -> deactivate (reversible) -> (grace) -> anonymize (keeps content).
+    #
+    # An account counts as dormant when it has not logged in (nor used an API
+    # token) for this many days.
+    INACTIVE_USER_DORMANCY_DAYS = values.IntegerValue(3 * 365)
+    # Days after the warning email before a still-dormant account is
+    # deactivated (is_active=False). Logging in within this window cancels it.
+    INACTIVE_USER_WARNING_GRACE_DAYS = values.IntegerValue(90)
+    # Days after deactivation before the account is anonymized (PII scrubbed,
+    # tokens disabled; token-created content is kept, attribution dropped).
+    INACTIVE_USER_DEACTIVATION_GRACE_DAYS = values.IntegerValue(90)
+    # Spam protection for the warning mailing: send in batches of this size,
+    # then pause for this many seconds before the next batch.
+    INACTIVE_USER_MAIL_BATCH_SIZE = values.IntegerValue(25)
+    INACTIVE_USER_MAIL_BATCH_DELAY = values.IntegerValue(60)
+
+    # Never-verified / spam signup purge (manual ``purge_unverified_users``).
+    # A signup whose email was never confirmed is deleted after this many days.
+    # No email is ever sent (the address was never confirmed). Separate from the
+    # inactive-account lifecycle above, which only touches *verified* accounts.
+    UNVERIFIED_USER_GRACE_DAYS = values.IntegerValue(30)
+
+    # ###### User statistics (``manage.py user_stats``) ######
+    # Signup email domains are grouped as academic / freemail / other.
+    # Freemail: exact domains (lower case).
+    USER_STATS_FREEMAIL_DOMAINS = values.ListValue(
+        [
+            "aol.com",
+            "freenet.de",
+            "gmail.com",
+            "gmx.at",
+            "gmx.ch",
+            "gmx.de",
+            "gmx.net",
+            "googlemail.com",
+            "hotmail.com",
+            "hotmail.de",
+            "icloud.com",
+            "live.com",
+            "live.de",
+            "mail.de",
+            "mailbox.org",
+            "me.com",
+            "outlook.com",
+            "outlook.de",
+            "posteo.de",
+            "proton.me",
+            "protonmail.com",
+            "t-online.de",
+            "web.de",
+            "yahoo.com",
+            "yahoo.de",
+        ]
+    )
+    # Academic: any domain label equal to one of these (``mit.edu``,
+    # ``ox.ac.uk``) ...
+    USER_STATS_ACADEMIC_DOMAIN_LABELS = values.ListValue(["edu", "ac"])
+    # ... or any label starting with one of these (``uni-koeln.de``,
+    # ``stud.tu-berlin.de``).
+    USER_STATS_ACADEMIC_DOMAIN_PREFIXES = values.ListValue(
+        ["uni-", "tu-", "fh-", "hs-", "th-", "hu-", "fu-"]
+    )
+    # Length of the top-N lists (e.g. signups by country).
+    USER_STATS_TOP_N = values.IntegerValue(15)
+    # ``--free-text``: longer use-case texts are cut to this many characters.
+    USER_STATS_FREE_TEXT_MAX_CHARS = values.IntegerValue(1000)
+
+    # ############## SOCIAL AUTH (allauth) ##############
+    # GitHub + Google sign-in. Credentials come from env; a provider only
+    # appears on the login page when its client id + secret are set (wired in
+    # ``_apply_dynamic_settings`` -> SOCIALACCOUNT_PROVIDERS APPS). This is also
+    # the MCP sign-in surface, so social login lets Claude/MCP users complete
+    # the OAuth authorize flow too.
+    SOCIALACCOUNT_ADAPTER = "oldp.apps.accounts.adapters.CustomSocialAccountAdapter"
+    # Redirect straight to the provider when the social button is clicked,
+    # instead of showing an intermediate "Continue with X" confirmation page
+    # (which is an extra click and uses allauth's unstyled template).
+    SOCIALACCOUNT_LOGIN_ON_GET = True
+    # Providers verify the email themselves, so don't force our own re-verify.
+    SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+    SOCIALACCOUNT_EMAIL_REQUIRED = True
+    SOCIALACCOUNT_PROVIDERS = {}
+    # Provider credentials are read straight from the environment in
+    # ``_apply_dynamic_settings`` (NOT via Value descriptors — inherited
+    # environ_name Values don't resolve reliably there). Set these env vars to
+    # enable a provider:
+    #   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
+    #   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
+
+    # Internationalization
+    # https://docs.djangoproject.com/en/5.0/topics/i18n/
+
+    # Select language based on domain
+    # https://7webpages.com/blog/switch-language-regarding-of-domain-in-django/
+
+    # Set like this: DJANGO_LANGUAGES_DOMAINS="{'de.foo.com':'de','fr.foo.com':'fr'}"
+    LANGUAGES_DOMAINS = values.DictValue(
+        {
+            "localhost:8000": "en",
+            "oldp.local:8000": "en",
+            "de.oldp.local:8000": "de",
+            "ar.oldp.local:8000": "ar",
+            "spoof-upright-backyard.ngrok-free.dev": "ar",
+            "127.0.0.1:8000": "de",
+        }
+    )
+
+    LANGUAGE_CODE = "en"
+
+    LANGUAGES = (
+        ("en", _("English")),
+        ("de", _("German")),
+        ("ar", _("Arabic")),
+    )
+
+    LOCALE_PATHS = (PACKAGE_DIR / "locale",)
+
+    TIME_ZONE = "UTC"
+
+    USE_I18N = True
+
+    USE_L10N = True
+
+    USE_TZ = True
+
+    PAGINATE_BY = 50  # Items per page
+
+    PAGINATE_UNTIL = 10  # Max. number of pages
+
+    BULK_EXPORT_URL = values.Value("https://static.openlegaldata.io/dumps/")
+
+    DATABASES = values.DatabaseURLValue("sqlite:///dev.db")
+
+    # Caching
+
+    CACHE_DISABLE = values.BooleanValue(False)
+    # Default TTL for cached API/HTML views, in seconds. Long-tail content
+    # (case detail, law detail, court lists) changes slowly; 6h is a good
+    # tradeoff between freshness and origin-load reduction.
+    CACHE_TTL = values.IntegerValue(60 * 60 * 6)
+    # Longer TTL for stats endpoints — these aggregate over the full corpus
+    # and update only as new cases are ingested. 24h keeps them cheap.
+    CACHE_TTL_STATS = values.IntegerValue(60 * 60 * 24)
+    CACHE_BACKEND = values.Value("file", environ_name="CACHE_BACKEND")
+    # zlib-compress Redis cache values. Most of the cache is rendered HTML
+    # and pickled pages, which shrink several-fold, so the same ``maxmemory``
+    # holds several times more entries. Entries written uncompressed are
+    # still read, so toggling this needs no cache flush.
+    CACHE_REDIS_COMPRESS = values.BooleanValue(True)
+
+    # Profiling toggles (enable temporarily on production)
+    PROFILING_ENABLED = values.BooleanValue(False, environ_name="PROFILING_ENABLED")
+    QUERYCOUNT_ENABLED = values.BooleanValue(False, environ_name="QUERYCOUNT_ENABLED")
+
+    # Honor the 'X-Forwarded-Proto' header for request.is_secure()
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    # Transport security — MUST live on BaseConfiguration, not ProdConfiguration.
+    # The deployed config is ProdDEConfiguration(BaseDEConfiguration,
+    # ProdConfiguration): django-configurations injects Django's defaults onto
+    # the DE classes, which sit before ProdConfiguration in the MRO and shadow
+    # any value set there (so settings on ProdConfiguration silently resolve to
+    # Django's default). Values on BaseConfiguration DO propagate to the DE
+    # configs. Secure by default (only send session/CSRF cookies over HTTPS and
+    # redirect to HTTPS) but env-overridable so a plain-HTTP deployment (local
+    # dev, an HTTP stage) can opt out via DJANGO_SESSION_COOKIE_SECURE etc.
+    # HSTS is intentionally not emitted (disabled at the Cloudflare edge).
+    # TestConfiguration overrides these to False so the test client is not 301'd.
+    SESSION_COOKIE_SECURE = values.BooleanValue(True)
+    CSRF_COOKIE_SECURE = values.BooleanValue(True)
+    SECURE_SSL_REDIRECT = values.BooleanValue(True)
+
+    # Static files (CSS, JavaScript, Images)
+    # https://docs.djangoproject.com/en/1.9/howto/static-files/
+    STATIC_ROOT = PACKAGE_DIR / "assets/static-dist"
+    STATIC_URL = "/static/"
+
+    STATICFILES_FINDERS = (
+        "django.contrib.staticfiles.finders.FileSystemFinder",
+        "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+        "compressor.finders.CompressorFinder",
+    )
+
+    # Extra places for collectstatic to find static files.
+    STATICFILES_DIRS = [PACKAGE_DIR / "assets/static"]
+
+    # Set compress compilers
+    COMPRESS_ENABLED = True
+    COMPRESS_OFFLINE = True
+
+    COMPRESS_PRECOMPILERS = [
+        # SASS compiler
+        ("text/x-scss", "sass {infile} {outfile}"),
+        # ('text/x-scss', 'django_libsass.SassCompiler'),
+    ]
+    COMPRESS_OUTPUT_DIR = "cache"
+
+    MEDIA_ROOT = BASE_DIR / "media"
+    MEDIA_URL = "/media/"
+
+    # Simplified static file serving.
+    # https://warehouse.python.org/project/whitenoise/
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+
+    # Tellme feedback
+    # TELLME_FEEDBACK_EMAIL = values.Value('hello@openlegaldata.io', environ_name='FEEDBACK_EMAIL')
+
+    # CKEditor (wysiwyg)
+    # disabled due to unfixed security issue
+
+    # Elasticsearch
+    ELASTICSEARCH_URL = values.Value(
+        "http://localhost:9200/", environ_name="ELASTICSEARCH_URL"
+    )
+    ELASTICSEARCH_INDEX = values.Value("oldp", environ_name="ELASTICSEARCH_INDEX")
+    # Per-call ES timeout (seconds). Must leave headroom under
+    # ``GUNICORN_TIMEOUT`` so Django catches the ``ConnectionTimeout``
+    # and runs the ``SearchBackendTimeout`` handler before gunicorn
+    # kills the worker. With ``retry_on_timeout=True`` and
+    # ``max_retries=1`` the wall-clock cost is at most ``2 *
+    # ELASTICSEARCH_TIMEOUT``, so pick well under half of
+    # ``GUNICORN_TIMEOUT``.
+    #
+    # Default 5s keeps the first attempt + retry inside a 9s
+    # gunicorn budget while still tolerating cold-cache reads.
+    ELASTICSEARCH_TIMEOUT = values.IntegerValue(5, environ_name="ELASTICSEARCH_TIMEOUT")
+
+    HAYSTACK_CONNECTIONS = {
+        "default": {
+            "ENGINE": "oldp.apps.search.search_backend.SearchEngine",
+            "URL": values.Value(
+                "http://localhost:9200/", environ_name="ELASTICSEARCH_URL"
+            ),
+            "INDEX_NAME": values.Value("oldp", environ_name="ELASTICSEARCH_INDEX"),
+            # Resolved at setup_dynamic_settings time — see the override
+            # in ``setup_dynamic_settings`` below.
+            "TIMEOUT": 5,
+            "SILENTLY_FAIL": False,
+            "KWARGS": {
+                "retry_on_timeout": True,
+                "max_retries": 1,
+            },
+        },
+    }
+
+    # German analysis incl. the externally-loaded synonym vocabulary (see
+    # module top + oldp/apps/search/analysis.py). Synonym filters appear
+    # only when OLDP_SEARCH_SYNONYMS_FILE is configured; merged into
+    # haystack's DEFAULT_SETTINGS by SearchBackend.__init__.
+    ELASTICSEARCH_INDEX_SETTINGS = add_arabic_analyzers(
+        build_german_index_settings(LEGAL_SYNONYMS, CONCEPT_SYNONYMS + LAW_SYNONYMS)
+    )
+
+    # Language of the analyzer applied to free-text search fields
+    # (text/title/exact_matches): "german" (default) or "arabic" (Arabic +
+    # French content). Changing it requires `manage.py rebuild_index`.
+    # Set via env: DJANGO_SEARCH_TEXT_ANALYZER=arabic
+    SEARCH_TEXT_ANALYZER = values.Value("german")
+
+    # Search API: max number of highlight snippets returned per result
+    SEARCH_MAX_SNIPPETS = 3
+    SEARCH_SNIPPET_SIZE = 200
+
+    # Logging
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "console": {
+                "format": "%(asctime)s %(levelname)-8s %(name)-12s %(message)s",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "console",
+            },
+            "logfile": {
+                "level": "DEBUG",
+                "class": "oldp.utils.log_handlers.ModeAwareRotatingFileHandler",
+                "filename": BASE_DIR / "logs/oldp.log",
+                "maxBytes": 1024 * 1024 * 15,  # 15MB
+                "backupCount": 10,
+                "formatter": "console",
+            },
+            # Add Handler for Sentry for `warning` and above
+            # 'sentry': {
+            #     'level': 'WARNING',
+            #     'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+            # },
+        },
+        "loggers": {
+            "": {  # root logger
+                "level": "INFO",
+                "handlers": ["console", "logfile"],
+            },
+            "oldp": {
+                "level": "DEBUG",
+            },
+            "refex": {
+                "level": "DEBUG",
+            },
+            "requests": {"level": "ERROR"},
+            "elasticsearch": {"level": "ERROR"},
+        },
+    }
+
+    # Test config
+    #########################
+
+    # Set false to exclude specific tests from test suite
+    # TEST_MYSQL = False  # auto detection based on DB settings
+    TEST_WITH_ES = values.BooleanValue(True)
+    TEST_WITH_WEB = values.BooleanValue(True)
+    TEST_WITH_SELENIUM = values.BooleanValue(False)
+
+    ########################
+    # Rest API framework
+    ########################
+
+    REST_FRAMEWORK = {
+        # Use Django's standard `django.contrib.auth` permissions,
+        # or allow read-only access for unauthenticated users.
+        "DEFAULT_PERMISSION_CLASSES": [
+            "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
+        ],
+        "DEFAULT_PAGINATION_CLASS": "oldp.api.CappedLimitOffsetPagination",
+        "DEFAULT_FILTER_BACKENDS": (
+            "django_filters.rest_framework.DjangoFilterBackend",
+        ),
+        "PAGE_SIZE": 50,
+        "DEFAULT_RENDERER_CLASSES": (
+            "rest_framework.renderers.JSONRenderer",
+            "rest_framework.renderers.BrowsableAPIRenderer",
+            "rest_framework_xml.renderers.XMLRenderer",
+        ),
+        # Auth
+        "DEFAULT_AUTHENTICATION_CLASSES": (
+            "oldp.apps.accounts.authentication.CombinedTokenAuthentication",
+            "rest_framework.authentication.SessionAuthentication",
+        ),
+        "DEFAULT_THROTTLE_CLASSES": (
+            "rest_framework.throttling.AnonRateThrottle",
+            "oldp.api.throttling.TokenUserRateThrottle",
+        ),
+        "DEFAULT_THROTTLE_RATES": {
+            "anon": "100/day",
+            "user": "5000/hour",
+            # Bonus tier granted when a user completes their profile (see
+            # UserProfile.enriched_at + api.throttling.TokenUserRateThrottle).
+            "enriched": "10000/hour",
+        },
+        "EXCEPTION_HANDLER": "oldp.api.exceptions.full_details_exception_handler",
+    }
+
+    SWAGGER_SETTINGS = {
+        "SECURITY_DEFINITIONS": {
+            "api_key": {"type": "apiKey", "in": "header", "name": "Authorization"}
+        },
+    }
+
+    # Processing pipeline
+    PROCESSING_STEPS = {
+        "Case": [
+            "oldp.apps.cases.processing.processing_steps.assign_court",
+            "oldp.apps.cases.processing.processing_steps.extract_refs",
+            "oldp.apps.cases.processing.processing_steps.generate_related",
+            "oldp.apps.cases.processing.processing_steps.set_review_pending",
+            "oldp.apps.cases.processing.processing_steps.set_review_accepted",
+            "oldp.apps.cases.processing.processing_steps.set_review_rejected",
+        ],
+        "Law": [
+            "oldp.apps.laws.processing.processing_steps.extract_refs",
+            "oldp.apps.laws.processing.processing_steps.set_review_pending",
+            "oldp.apps.laws.processing.processing_steps.set_review_accepted",
+        ],
+        "LawBook": [
+            "oldp.apps.topics.processing.processing_steps.assign_topics_to_law_book",
+            "oldp.apps.laws.processing.processing_steps.set_lawbook_review_pending",
+            "oldp.apps.laws.processing.processing_steps.set_lawbook_review_accepted",
+        ],
+        "Court": [
+            "oldp.apps.courts.processing.processing_steps.enrich_from_wikipedia",
+            "oldp.apps.courts.processing.processing_steps.set_aliases",
+            "oldp.apps.courts.processing.processing_steps.assign_jurisdiction",
+            "oldp.apps.courts.processing.processing_steps.set_review_pending",
+            "oldp.apps.courts.processing.processing_steps.set_review_accepted",
+        ],
+        "Reference": [
+            "oldp.apps.references.processing.processing_steps.assign_refs",
+        ],
+    }
+
+    # Courts
+    COURT_JURISDICTIONS = {}
+    COURT_LEVELS_OF_APPEAL = {}
+    COURT_TYPES = CourtTypesDefault()
+
+    # Whether the ``assign_court`` processing step re-derives the slug (= the
+    # case URL) of a case that already had a real court. Off by default so
+    # re-processing never breaks indexed URLs; placeholder slugs (empty, or
+    # from the "unknown" court) are always replaced.
+    CASE_ASSIGN_COURT_UPDATE_SLUG = values.BooleanValue(False)
+
+    # Case creation API validation settings
+    # These settings control input validation for the case creation API endpoint
+    CASE_CREATION_VALIDATION = {
+        "content_min_length": 10,  # Minimum case content length
+        "content_max_length": 10000000,  # Maximum case content length (10MB)
+        "file_number_min_length": 1,  # Minimum file number length
+        "file_number_max_length": 100,  # Maximum file number length
+        "title_max_length": 255,  # Maximum title length
+        "abstract_max_length": 50000,  # Maximum abstract length
+        "court_name_max_length": 255,  # Maximum court name length
+    }
+
+    ########################
+    # MCP Server
+    ########################
+
+    DJANGO_MCP_ENDPOINT = "mcp"
+    DJANGO_MCP_GLOBAL_SERVER_CONFIG = {
+        "name": "oldp",
+        "instructions": (
+            "Open Legal Data Platform (OLDP) - German legal data including court "
+            "decisions and legislation with cross-references.\n"
+            "Start with get_platform_info to understand data coverage.\n"
+            "Use search_cases for full-text search, filter_cases for structured queries.\n"
+            "Use get_case / get_law_section to retrieve the complete text (plain "
+            "text, not HTML). For long documents pass offset and/or length to "
+            "read a snippet and continue with next_offset while has_more is "
+            "true.\n"
+            "Cross-reference tools (get_case_references, get_citing_cases, "
+            "get_cases_for_law) let you navigate the citation graph between cases "
+            "and laws.\n"
+            "References are automatically extracted and may be incomplete - verify "
+            "critical citations against the full text."
+        ),
+        "stateless": True,
+    }
+    DJANGO_MCP_GET_SERVER_INSTRUCTIONS_TOOL = True
+
+    # MCP rate limiting (env-configurable)
+    MCP_ANTHROPIC_ANON_RATE = values.Value(
+        "500/hour", environ_name="MCP_ANTHROPIC_ANON_RATE"
+    )
+    # Authenticated MCP requests share the per-user REST API budget
+    # (REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]), see MCPUserThrottle.
+
+    ########################
+    # OAuth2 (MCP connector auth)
+    ########################
+
+    OAUTH2_PROVIDER = {
+        "SCOPES": {"read": _("Read access to legal data")},
+        "DEFAULT_SCOPES": ["read"],
+        "PKCE_REQUIRED": True,
+        "ALLOWED_REDIRECT_URI_SCHEMES": ["https", "http"],
+        "REQUEST_APPROVAL_PROMPT": "auto",
+        "ACCESS_TOKEN_EXPIRE_SECONDS": 3600,
+        "REFRESH_TOKEN_EXPIRE_SECONDS": 86400 * 30,
+        "ROTATE_REFRESH_TOKEN": True,
+    }
+
+    #######################
+    # Setup methods
+    #######################
+
+    @classmethod
+    def setup(cls):
+        """Resolve settings values and apply dynamic runtime configuration."""
+        super().setup()
+        cls._apply_dynamic_settings()
+
+    @classmethod
+    def _apply_dynamic_settings(cls):
+        """Apply dynamic settings mutations once per configuration class."""
+        if getattr(cls, "_DYNAMIC_SETTINGS_APPLIED", False):
+            return
+        cls._DYNAMIC_SETTINGS_APPLIED = True
+
+        # django-configurations resolves Value descriptors declared on the selected
+        # class, but inherited Value fields can still be unresolved here. We rely on
+        # several inherited flags/env values below.
+        for attr_name in (
+            "CACHE_BACKEND",
+            "CACHE_DISABLE",
+            "ELASTICSEARCH_TIMEOUT",  # consumed by SearchBackend.__init__
+            "MCP_ANTHROPIC_ANON_RATE",
+            "PROFILING_ENABLED",
+            "QUERYCOUNT_ENABLED",
+        ):
+            attr_value = getattr(cls, attr_name, None)
+            if isinstance(attr_value, Value):
+                setup_value(cls, attr_name, attr_value)
+
+        # Wire social-auth provider apps from env credentials. We read
+        # os.environ directly rather than the ``*_CLIENT_ID`` Value descriptors:
+        # those are inherited environ_name Values that don't reliably resolve on
+        # ``cls`` at this point (they read back as their empty default). A
+        # provider is only registered when both its id and secret are present,
+        # so an unconfigured provider simply doesn't render on the login page.
+        github_id = os.environ.get("GITHUB_CLIENT_ID", "")
+        github_secret = os.environ.get("GITHUB_CLIENT_SECRET", "")
+        google_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+        google_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+        providers = {}
+        if github_id and github_secret:
+            providers["github"] = {
+                "APPS": [{"client_id": github_id, "secret": github_secret, "key": ""}],
+                "SCOPE": ["user:email"],
+            }
+        if google_id and google_secret:
+            providers["google"] = {
+                "APPS": [{"client_id": google_id, "secret": google_secret, "key": ""}],
+                "SCOPE": ["profile", "email"],
+                "AUTH_PARAMS": {"access_type": "online"},
+            }
+        cls.SOCIALACCOUNT_PROVIDERS = providers
+
+        # ``ELASTICSEARCH_TIMEOUT`` is read by ``SearchBackend.__init__``
+        # at construction time — see ``oldp.apps.search.search_backend``.
+        # We don't mutate ``HAYSTACK_CONNECTIONS`` here because
+        # ``TestConfiguration`` overrides it as a ``@property`` (fresh
+        # dict per access), so the mutation would be lost.
+
+        if cls.DATABASES["default"]["ENGINE"] == "django.db.backends.mysql":
+            # Force strict mode (MySQL only)
+            # https://stackoverflow.com/questions/23022858/force-strict-sql-mode-in-django
+            if "OPTIONS" not in cls.DATABASES["default"]:
+                cls.DATABASES["default"]["OPTIONS"] = {}
+
+            cls.DATABASES["default"]["OPTIONS"]["sql_mode"] = "traditional"
+            cls.DATABASES["default"]["OPTIONS"]["charset"] = "utf8mb4"
+
+            cls.DATABASE_MYSQL = True
+        else:
+            cls.DATABASE_MYSQL = False
+
+        # Dynamic cache configuration based on CACHE_BACKEND environment variable
+        if cls.CACHE_BACKEND == "redis":
+            cls.CACHES = {
+                "default": {
+                    "BACKEND": "django_redis.cache.RedisCache",
+                    "LOCATION": values.Value(
+                        "redis://127.0.0.1:6379/1", environ_name="REDIS_URL"
+                    ),
+                    "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+                }
+            }
+            if cls.CACHE_REDIS_COMPRESS:
+                cls.CACHES["default"]["OPTIONS"]["COMPRESSOR"] = (
+                    "django_redis.compressors.zlib.ZlibCompressor"
+                )
+        else:  # Default to file-based cache
+            cls.CACHES = {
+                "default": {
+                    "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+                    "LOCATION": values.Value(
+                        "/var/tmp/django_cache", environ_name="FILE_CACHE_LOCATION"
+                    ),
+                }
+            }
+
+        # Disable cache
+        if cls.DEBUG and cls.CACHE_DISABLE:
+            cls.CACHES["default"]["BACKEND"] = (
+                "django.core.cache.backends.dummy.DummyCache"
+            )
+
+        # Django Silk profiling
+        if cls.PROFILING_ENABLED:
+            cls.INSTALLED_APPS = list(cls.INSTALLED_APPS) + ["silk"]
+            cls.MIDDLEWARE = list(cls.MIDDLEWARE) + [
+                "silk.middleware.SilkyMiddleware",
+            ]
+            cls.SILKY_INTERCEPT_PERCENT = 100
+            cls.SILKY_MAX_RECORDED_REQUESTS = 10_000
+            cls.SILKY_MAX_RECORDED_REQUESTS_CHECK_PERCENT = 10
+            cls.SILKY_PYTHON_PROFILER = True
+            cls.SILKY_PYTHON_PROFILER_RESULT_PATH = str(
+                cls.WORKING_DIR / "silk-profiles/"
+            )
+            cls.SILKY_AUTHENTICATION = True
+            cls.SILKY_AUTHORISATION = True
+            cls.SILKY_META = True
+
+        # Django querycount header
+        if cls.QUERYCOUNT_ENABLED:
+            cls.MIDDLEWARE = list(cls.MIDDLEWARE) + [
+                "querycount.middleware.QueryCountMiddleware",
+            ]
+            cls.QUERYCOUNT = {
+                "THRESHOLDS": {
+                    "MEDIUM": 50,
+                    "HIGH": 200,
+                    "MIN_TIME_TO_LOG": 0,
+                    "MIN_QUERY_COUNT_TO_LOG": 0,
+                },
+                "DISPLAY_DUPLICATES": 5,
+            }
+
+        # Overwrite log filename
+        log_file = values.Value(default=None, environ_name="LOG_FILE")
+
+        if (
+            "handlers" in cls.LOGGING
+            and "logfile" in cls.LOGGING["handlers"]
+            and log_file
+        ):
+            cls.LOGGING["handlers"]["logfile"]["filename"] = os.path.join(
+                cls.BASE_DIR, "logs", log_file
+            )
+
+        # Apply env-configurable rotation parameters to the logfile
+        # handler. LOG_MAX_BYTES/LOG_BACKUP_COUNT are resolved by
+        # django-configurations at this point.
+        if "handlers" in cls.LOGGING and "logfile" in cls.LOGGING["handlers"]:
+            cls.LOGGING["handlers"]["logfile"]["maxBytes"] = cls.LOG_MAX_BYTES
+            cls.LOGGING["handlers"]["logfile"]["backupCount"] = cls.LOG_BACKUP_COUNT
+
+    @classmethod
+    def post_setup(cls):
+        """Keep compatibility with django-configurations post_setup hook."""
+        cls._apply_dynamic_settings()
+
+
+class DevConfiguration(BaseConfiguration):
+    """Development settings (debugging enabled)"""
+
+    DEBUG = True
+
+    ALLOWED_HOSTS = ["*"]
+
+    COMPRESS_OFFLINE = False
+
+    INSTALLED_APPS = BaseConfiguration.INSTALLED_APPS + [
+        "debug_toolbar",
+    ]
+
+    MIDDLEWARE = BaseConfiguration.MIDDLEWARE + [
+        "debug_toolbar.middleware.DebugToolbarMiddleware",
+    ]
+
+
+class TestConfiguration(BaseConfiguration):
+    """Use these settings for unit testing"""
+
+    DEBUG = True
+
+    # The BaseConfiguration transport-security defaults are True; disable them
+    # for tests so the test client isn't 301-redirected to https / cookies work
+    # over the test's plain-HTTP requests. Single inheritance here, so these
+    # apply directly (unlike the ProdConfiguration diamond).
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+
+    COMPRESS_OFFLINE = False
+    COMPRESS_ENABLED = False
+    COMPRESS_PRECOMPILERS = []  # Disable SCSS compilation in tests
+
+    DATABASES = values.DatabaseURLValue("sqlite:///test.db")
+    ELASTICSEARCH_INDEX = values.Value("oldp_test")
+
+    # Control mocking: True = use mocks (default), False = use real ES
+    MOCK_ES_TESTS = values.BooleanValue(True)
+
+    # Enable ES tests by default (they now run with mocks)
+    TEST_WITH_ES = values.BooleanValue(True)
+    TEST_WITH_WEB = values.BooleanValue(False)
+    TEST_WITH_SELENIUM = values.BooleanValue(False)
+
+    @property
+    def HAYSTACK_CONNECTIONS(self):
+        """Configure Haystack to use mock or real Elasticsearch based on settings."""
+        if self.MOCK_ES_TESTS:
+            return {
+                "default": {
+                    "ENGINE": "oldp.apps.search.mock_backend.MockElasticsearchEngine",
+                }
+            }
+        return {
+            "default": {
+                "ENGINE": "oldp.apps.search.search_backend.SearchEngine",
+                "URL": "http://localhost:9200/",
+                "INDEX_NAME": "oldp_test",
+            }
+        }
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+
+    CACHE_DISABLE = True
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        }
+    }
+
+    # Override logging to suppress expected logs during tests
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "console": {
+                "format": "%(asctime)s %(levelname)-8s %(name)-12s %(message)s",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "console",
+                "level": "CRITICAL",  # Only show critical errors in console
+            },
+        },
+        "loggers": {
+            "": {  # root logger - suppress all but critical
+                "level": "CRITICAL",
+                "handlers": ["console"],
+            },
+            "django": {"level": "CRITICAL"},
+            "django.request": {"level": "CRITICAL"},
+            "oldp": {"level": "CRITICAL"},
+            "refex": {"level": "CRITICAL"},
+            "haystack": {"level": "CRITICAL"},
+            "elasticsearch": {"level": "CRITICAL"},
+        },
+    }
+
+    @classmethod
+    def post_setup(cls):
+        """Override post_setup to skip LOGGING modification since it's a property"""
+        # Handle DATABASE setup
+        if cls.DATABASES["default"]["ENGINE"] == "django.db.backends.mysql":
+            if "OPTIONS" not in cls.DATABASES["default"]:
+                cls.DATABASES["default"]["OPTIONS"] = {}
+            cls.DATABASES["default"]["OPTIONS"]["sql_mode"] = "traditional"
+            cls.DATABASE_MYSQL = True
+        else:
+            cls.DATABASE_MYSQL = False
+
+        # CACHES already set in TestConfiguration, no need to modify
+        # LOGGING is a property in TestConfiguration, skip modification
+
+
+class ProdConfiguration(BaseConfiguration):
+    """Production settings (override default values with environment vars"""
+
+    SECRET_KEY = values.SecretValue()
+
+    DEBUG = False
+
+    ALLOWED_HOSTS = values.ListValue(["de.openlegaldata.io", "localhost"])
+
+    ADMINS = values.SingleNestedTupleValue()
+
+    # NOTE: the transport-security settings (SESSION_COOKIE_SECURE,
+    # CSRF_COOKIE_SECURE, SECURE_SSL_REDIRECT) live on BaseConfiguration, NOT
+    # here — on ProdConfiguration they are shadowed for the deployed
+    # ProdDEConfiguration and silently resolve to Django's insecure defaults.
+
+    # Override logging to set INFO level for production
+    @property
+    def LOGGING(self):
+        """Set log level to INFO for production to reduce verbosity"""
+        config = super().LOGGING.copy()
+        # Update oldp and refex loggers to INFO level instead of DEBUG
+        config["loggers"]["oldp"]["level"] = "INFO"
+        config["loggers"]["refex"]["level"] = "INFO"
+        return config
